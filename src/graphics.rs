@@ -7,6 +7,7 @@
 ///
 /// Sprites are XORed onto the screen, and if a pixel flips from 1 to 0, it is signalled in
 /// the `VF` register.
+#[derive(Debug)]
 pub struct Graphics {
     /// Screen on which sprites are drawn
     screen: Vec<u8>,
@@ -25,14 +26,14 @@ impl Graphics {
     /// initialized to 0.
     pub fn new() -> Self {
         Graphics {
-            screen: vec![0; SCREEN_SIZE],
+            screen: vec![0; SCREEN_SIZE as usize],
         }
     }
 
     /// Clears the entire screen with 0s; wipes everything from the screen.
     pub fn clear(&mut self) {
-        for i in screen {
-            i = 0;
+        for i in 0..self.screen.len() {
+            self.screen[i] = 0;
         }
     }
 
@@ -43,9 +44,9 @@ impl Graphics {
     pub fn draw(&mut self, opcode: &u8, ir: &u8, memory: &Vec<u8>) -> bool {
         // x and y position, and height of the sprite, with the origin at the 
         // top left corner
-        let x = (opcode & 0x0F00) >> 8;
-        let y = (opcode & 0x00F0) >> 4;
-        let num_rows = (opcode & 0x000F);
+        let x: u16 = ((*opcode as u16) & 0x0F00) >> 8;
+        let y: u16 = ((*opcode as u16) & 0x00F0) >> 4;
+        let num_rows: u16 = (*opcode as u16) & 0x000F;
 
         // Assume no collisions happen
         let mut pixel_flipped = false;
@@ -56,15 +57,15 @@ impl Graphics {
                 // Check if the bit is set. Sprites are layed out in memory starting
                 // with the top left corner. 0x80 = 128, so we begin drawing from the
                 // top left corner
-                if memory[ir + row] & (0x80 >> col) != 0 {
+                if memory[(*ir as u16 + row) as usize] & (0x80 >> col) != 0 {
                     // If a bit changes from 1 to 0, we need to signal it in the "carry" bit
-                    if screen[(((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)] == 1 {
+                    if self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)) as usize] == 1 {
                         pixel_flipped = true;
                     }
                     // This math maps a multidimensional array index to a single dimensional array,
                     // and the modulus takes care of wrapping around the screen if the index goes 
                     // past it
-                    screen[(((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)] ^= 1;
+                    self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)) as usize] ^= 1;
                 }
             }
         }
