@@ -39,14 +39,14 @@ impl Graphics {
 
     /// Draws a sprite on the screen, and returns `true` if a pixel on the screen was flipped from
     /// 1 to 0. `opcode`: Determines position and height of sprite, with position being top left
-    ///   corner of the sprite. `ir`: The index register, which contains the area of memory to
-    ///   start reading the sprite from. `memory`: The memory from which to read the sprite.
-    pub fn draw(&mut self, opcode: &u8, ir: &u8, memory: &Vec<u8>) -> bool {
+    /// corner of the sprite. `ir`: The index register, which contains the area of memory to
+    /// start reading the sprite from. `memory`: The memory from which to read the sprite.
+    pub fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool {
         // x and y position, and height of the sprite, with the origin at the 
         // top left corner
-        let x: u16 = ((*opcode as u16) & 0x0F00) >> 8;
-        let y: u16 = ((*opcode as u16) & 0x00F0) >> 4;
-        let num_rows: u16 = (*opcode as u16) & 0x000F;
+        let x = (*opcode & 0x0F00) >> 8;
+        let y = (*opcode & 0x00F0) >> 4;
+        let num_rows = *opcode & 0x000F;
 
         // Assume no collisions happen
         let mut pixel_flipped = false;
@@ -57,7 +57,7 @@ impl Graphics {
                 // Check if the bit is set. Sprites are layed out in memory starting
                 // with the top left corner. 0x80 = 128, so we begin drawing from the
                 // top left corner
-                if memory[(*ir as u16 + row) as usize] & (0x80 >> col) != 0 {
+                if memory[(*ir + row) as usize] & (0x80 >> col) != 0 {
                     // If a bit changes from 1 to 0, we need to signal it in the "carry" bit
                     if self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)) as usize] == 1 {
                         pixel_flipped = true;
