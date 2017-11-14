@@ -5,3 +5,7 @@ authors = ["Agoston Szepessy <agszepp@gmail.com>"]
 
 [dependencies]
 rand = "0.3.17"
+
+[dependencies.sdl2]
+version = "0.31"
+features = ["bundled"]
