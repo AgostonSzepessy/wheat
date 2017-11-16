@@ -1,11 +1,11 @@
-/// The graphics processing of the Chip8. The emulator has a screen that is `64`x`32` pixels.
+/// Graphics processor for Chip8. The emulator has a screen that is `64`x`32` pixels.
 ///
-/// All sprites drawn on it are 8 pixels wide, with each pixel being 1 bit, hence 8 pixels in 1
-/// byte. The position and height of each sprite is determined by the opcode `0xDxyn`, where 
+/// All sprites drawn on it are `8` pixels wide, with each pixel being `1` bit, so there are `8` pixels
+/// in `1` byte. The position and height of each sprite is determined by the opcode `0xDxyn`, where 
 /// `D` is the symbol for draw, `x` is the `x` position, `y` is the `y` position, and `n` is 
 /// the height of the sprite.
 ///
-/// Sprites are XORed onto the screen, and if a pixel flips from 1 to 0, it is signalled in
+/// Sprites are `XOR`ed onto the screen, and if a pixel flips from `1` to `0`, it is signalled in
 /// the `VF` register.
 #[derive(Debug)]
 pub struct Graphics {
