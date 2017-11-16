@@ -54,8 +54,10 @@ impl Input {
     /// To check if `Num1` is pressed:
     ///
     /// ```
+    /// use chip8::input::Input;
+    ///
     /// let input = Input::new();
-    /// assert_eq!(input.is_pressed(0x0), false);
+    /// assert_eq!(input.is_pressed(&0x0), false);
     /// ```
     pub fn is_pressed(&self, key: &u8) -> bool {
         self.keys[*key as usize]
@@ -67,31 +69,36 @@ mod tests {
     use super::Input;
     use sdl2::keyboard::Keycode;
 
-    #[test]
-    fn test_num1() {
-        let mut input = Input::new();
-        input.update(&Keycode::Num1, true);
-        assert_eq!(input.is_pressed(&0x1), true);
+    macro_rules! update_test {
+        ($($name:ident: $value:expr,)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (input_key, input_val) = $value;
+                    let mut input = Input::new();
+                    input.update(&input_key, true);
+                    assert_eq!(input.is_pressed(&input_val), true);
+                }
+            )*
+        }
     }
 
-    #[test]
-    fn test_num2() {
-        let mut input = Input::new();
-        input.update(&Keycode::Num2, true);
-        assert_eq!(input.is_pressed(&0x2), true);
-    }
-
-    #[test]
-    fn test_num3() {
-        let mut input = Input::new();
-        input.update(&Keycode::Num3, true);
-        assert_eq!(input.is_pressed(&0x3), true);
-    }
-
-    #[test]
-    fn test_num4() {
-        let mut input = Input::new();
-        input.update(&Keycode::Num4, true);
-        assert_eq!(input.is_pressed(&0xC), true);
+    update_test! {
+        test_num1: (Keycode::Num1, 0x1),
+        test_num2: (Keycode::Num2, 0x2),
+        test_num3: (Keycode::Num3, 0x3),
+        test_num4: (Keycode::Num4, 0xC),
+        test_q: (Keycode::Q, 0x4),
+        test_w: (Keycode::W, 0x5),
+        test_e: (Keycode::E, 0x6),
+        test_r: (Keycode::R, 0xD),
+        test_a: (Keycode::A, 0x7),
+        test_s: (Keycode::S, 0x8),
+        test_d: (Keycode::D, 0x9),
+        test_f: (Keycode::F, 0xE),
+        test_z: (Keycode::Z, 0xA),
+        test_x: (Keycode::X, 0x0),
+        test_c: (Keycode::C, 0xB),
+        test_v: (Keycode::V, 0xF),
     }
 }
