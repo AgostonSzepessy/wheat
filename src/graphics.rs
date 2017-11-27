@@ -73,3 +73,18 @@ impl Graphics {
         pixel_flipped
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clear() {
+        let mut graphics = Graphics::new();
+        graphics.clear();
+
+        for i in 0..graphics.screen.len() {
+            assert_eq!(graphics.screen[i], 0);
+        }
+    }
+}

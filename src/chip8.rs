@@ -154,7 +154,7 @@ impl Chip8 {
         match self.opcode & 0x00FF {
             // Clear the screen
             0x00E0 => {
-                unimplemented!();
+                self.graphics.clear();
             },
             // Return from subroutine
             0x00EE => {
@@ -504,11 +504,6 @@ mod tests {
         let (x, y) = chip8.get_regs_x_y();
         assert_eq!(x, 0xF);
         assert_eq!(y, 0xA);
-    }
-
-    #[test]
-    fn test_00e0() {
-
     }
 
     // First number is register A, second is register B
