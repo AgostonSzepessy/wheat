@@ -2,6 +2,7 @@ use rand;
 use rand::Rng;
 
 use graphics::Graphics;
+use input::Input;
 
 #[derive(Debug)]
 pub struct Chip8 {
@@ -11,6 +12,8 @@ pub struct Chip8 {
     memory: Vec<u8>,
     /// The index register
     ir: u16,
+    /// Input handler
+    input: Input,
     /// The program counter
     pc: u16,
     /// Screen that sprites get drawn on. 64x32 pixels
@@ -42,6 +45,7 @@ impl Chip8 {
             opcode: 0,
             memory: vec![0; MEMORY_SIZE],
             ir: 0,
+            input: Input::new(),
             pc: APP_LOCATION,
             graphics: Graphics::new(),
             delay_timer: 0,
@@ -276,7 +280,7 @@ impl Chip8 {
             0x0000 => {
                 let (x, y) = self.get_regs_x_y();
 
-                self.registers[x] += self.registers[y];
+                self.registers[x] = self.registers[y];
                 self.pc += 2;
             },
 
@@ -313,15 +317,16 @@ impl Chip8 {
             // VF is set to 1, otherwise it's set to 0
             0x0004 => {
                 let (x, y) = self.get_regs_x_y();
+                let (val, overflow) = self.registers[x].overflowing_add(self.registers[y]);
 
-                if self.registers[x] > 0xFF - self.registers[y] {
+                if overflow {
                     self.registers[0xF] = 1;
                 }
                 else {
                     self.registers[0xF] = 0;
                 }
 
-                self.registers[x] += self.registers[y];
+                self.registers[x] = val;
                 self.pc += 2;
             },
 
@@ -338,7 +343,8 @@ impl Chip8 {
                     self.registers[0xF] = 0;
                 }
 
-                self.registers[x] -= self.registers[y];
+                let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
+                self.registers[x] = val;
                 self.pc += 2;
             },
 
@@ -349,14 +355,9 @@ impl Chip8 {
             0x0006 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if self.registers[x] & 0x1 == 1 {
-                    self.registers[0xF] = 1;
-                }
-                else {
-                    self.registers[0xF] = 0;
-                }
+                self.registers[0xF] = self.registers[x] & 0x1;
 
-                self.registers[x] >>= 2;
+                self.registers[x] >>= 1;
                 self.pc += 2;
             },
 
@@ -373,7 +374,8 @@ impl Chip8 {
                     self.registers[0xF] = 0;
                 }
 
-                self.registers[x] = self.registers[y] - self.registers[x];
+                let (val, _) = self.registers[y].overflowing_sub(self.registers[x]);
+                self.registers[x] = val;
                 self.pc += 2;
             },
 
@@ -383,14 +385,8 @@ impl Chip8 {
             0x000E => {
                 let (x, _) = self.get_regs_x_y();
 
-                if self.registers[x] & 0x1 == 1 {
-                    self.registers[0xF] = 1;
-                }
-                else {
-                    self.registers[0xF] = 0;
-                }
-
-                self.registers[x] <<= 2;
+                self.registers[0xF] = self.registers[x] & 0x1;
+                self.registers[x] <<= 1;
                 self.pc += 2;
             },
 
@@ -467,13 +463,92 @@ impl Chip8 {
 mod tests {
     use super::Chip8;
 
+    fn create_chip8(opcode: u16) -> Chip8 {
+        let mut chip8 = Chip8::new();
+        chip8.opcode = opcode;
+        chip8
+    }
+
+    /// Tests the arithmetic operations of the Chip8 such as addition,
+    /// subtraction, multiplication, division, and bitwise operations.
+    /// `name` is the name of the test, `test_fn` is the function to be
+    /// tested, and `values` is a tuple containing the values that the test 
+    /// uses, in this order: the opcode, the initial value in register "x", the 
+    /// initial value in register "y", the final value in register "x", and
+    /// the expected value of the carry register.
+    macro_rules! test_arithmetic {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg1_start_val, reg2_start_val, reg1_end, carry) = $values;
+                    let mut chip8 = create_chip8(opcode);
+                    let (x, y) = chip8.get_regs_x_y();
+
+                    chip8.registers[x] = reg1_start_val;
+                    chip8.registers[y] = reg2_start_val;
+
+                    chip8.$test_fn();
+                    assert_eq!(chip8.registers[x], reg1_end);
+                    assert_eq!(chip8.registers[0xF], carry);
+                    assert_eq!(chip8.pc, 0x202);
+                }
+            )*
+        }
+    }
+
     #[test]
     fn test_regs_x_y() {
-        let mut chip8 = Chip8::new();
-        chip8.opcode = 0x0FA0;
+        let chip8 = create_chip8(0x0FA0);
 
         let (x, y) = chip8.get_regs_x_y();
         assert_eq!(x, 0xF);
         assert_eq!(y, 0xA);
+    }
+
+    #[test]
+    fn test_00e0() {
+
+    }
+
+    // First number is register A, second is register B
+    test_arithmetic! {
+        test_store: (opcode_0x8yyy, (0x8AB0, 1, 2, 2, 0)),
+
+        test_or_1_1: (opcode_0x8yyy, (0x8AB1, 1, 1, 1, 0)),
+        test_or_0_0: (opcode_0x8yyy, (0x8AB1, 0, 0, 0, 0)),
+        test_or_0_1: (opcode_0x8yyy, (0x8AB1, 0, 1, 1, 0)),
+        test_or_1_0: (opcode_0x8yyy, (0x8AB1, 1, 0, 1, 0)),
+
+        test_and_1_1: (opcode_0x8yyy, (0x8AB2, 1, 1, 1, 0)),
+        test_and_0_0: (opcode_0x8yyy, (0x8AB2, 0, 0, 0, 0)),
+        test_and_0_1: (opcode_0x8yyy, (0x8AB2, 0, 1, 0, 0)),
+        test_and_1_0: (opcode_0x8yyy, (0x8AB2, 1, 0, 0, 0)),
+
+        test_xor_1_1: (opcode_0x8yyy, (0x8AB3, 1, 1, 0, 0)),
+        test_xor_0_0: (opcode_0x8yyy, (0x8AB3, 0, 0, 0, 0)),
+        test_xor_0_1: (opcode_0x8yyy, (0x8AB3, 0, 1, 1, 0)),
+        test_xor_1_0: (opcode_0x8yyy, (0x8AB3, 1, 0, 1, 0)),
+
+        test_add_1_1: (opcode_0x8yyy, (0x8AB4, 1, 1, 2, 0)),
+        test_add_254_3: (opcode_0x8yyy, (0x8AB4, 254, 3, 1, 1)),
+
+        test_sub_1_1: (opcode_0x8yyy, (0x8AB5, 1, 1, 0, 0)),
+        test_sub_2_1: (opcode_0x8yyy, (0x8AB5, 2, 1, 1, 1)),
+        test_sub_2_3: (opcode_0x8yyy, (0x8AB5, 2, 3, 255, 0)),
+
+        test_shr_0: (opcode_0x8yyy, (0x8AB6, 0, 0, 0, 0)),
+        test_shr_1: (opcode_0x8yyy, (0x8AB6, 1, 0, 0, 1)),
+        test_shr_2: (opcode_0x8yyy, (0x8AB6, 2, 0, 1, 0)),
+        test_shr_3: (opcode_0x8yyy, (0x8AB6, 3, 0, 1, 1)),
+
+        test_subn_1_1: (opcode_0x8yyy, (0x8AB7, 1, 1, 0, 0)),
+        test_subn_1_2: (opcode_0x8yyy, (0x8AB7, 1, 2, 1, 1)),
+        test_subn_2_1: (opcode_0x8yyy, (0x8AB7, 2, 1, 255, 0)),
+
+        test_shl_0: (opcode_0x8yyy, (0x8ABE, 0, 0, 0, 0)),
+        test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 1)),
+        test_shl_2: (opcode_0x8yyy, (0x8ABE, 2, 0, 4, 0)),
+        test_shl_3: (opcode_0x8yyy, (0x8ABE, 3, 0, 6, 1)),
     }
 }

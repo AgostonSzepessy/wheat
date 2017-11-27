@@ -13,6 +13,7 @@ const NUM_KEYS: usize = 16;
 /// | Z (0xA) | X (0x0) | C (0xB) | V (0xF) |
 ///
 /// based off of this diagram: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
+#[derive(Debug)]
 pub struct Input {
     keys: Vec<bool>,
 }
