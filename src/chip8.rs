@@ -12,8 +12,6 @@ pub struct Chip8 {
     memory: Vec<u8>,
     /// The index register
     ir: u16,
-    /// Input handler
-    input: Input,
     /// The program counter
     pc: u16,
     /// Screen that sprites get drawn on. 64x32 pixels
@@ -45,7 +43,6 @@ impl Chip8 {
             opcode: 0,
             memory: vec![0; MEMORY_SIZE],
             ir: 0,
-            input: Input::new(),
             pc: APP_LOCATION,
             graphics: Graphics::new(),
             delay_timer: 0,
@@ -455,6 +452,62 @@ impl Chip8 {
         }
         else {
             self.registers[0xF] = 0;
+        }
+    }
+
+    /// Takes care of opcodes that are related to input such as checking whether
+    /// a key is pressed or not pressed, and waiting until a key is pressed.
+    fn handle_input(&mut self, &input: Input) {
+        match self.opcode & 0x0001 {
+            // Ex9E - SKP Vx
+            // Skips the next instruction if the key with the value of Vx is 
+            // pressed. If the key corresponding to the value of Vx is currently
+            // in the down position, PC is increased by 2.
+            0xE => {
+                let (x, _) = self.get_regs_x_y();
+
+                if input.is_pressed(&x) {
+                    self.pc += 2;
+                }
+
+                self.pc += 2;
+            },
+
+            // Ex9E - SKNP Vx
+            // Skip next instruction if key with value Vx is not pressed. If the
+            // key with value Vx is not pressed, the program counter is incremented
+            // by 2.
+            0x1 => {
+                let (x, _) = self.get_regs_x_y();
+
+                if !input.is_pressed(&x) {
+                    self.pc += 2;
+                }
+
+                self.pc += 2;
+            },
+
+            // Fx0A - LD Vx, K
+            // Wait for a key press, store the value of the key in Vx.
+            // All execution stops until a key is pressed, then the value
+            // of that key is stored in Vx.
+            0xA => {
+                let (x, _) = self.get_regs_x_y();
+
+                // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
+                // range
+                for i in 0x0..0x10 {
+                    if input.is_pressed(i) {
+                        self.registers[x] = i;
+                        self.pc += 2;
+                        break;
+                    }
+                }
+            },
+
+            _ => {
+                self.unknown_opcode();
+            }
         }
     }
 }
