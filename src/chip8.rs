@@ -510,6 +510,41 @@ impl Chip8 {
             }
         }
     }
+
+    fn opcode_0xfyyy(&mut self) {
+        match self.opcode & 0xFF {
+            // Fx07 - LD Vx, DT
+            // Set Vx = delay timer value.
+            // The value of DT is placed into Vx.
+            0x07 => {
+                let (x, _) = self.get_regs_x_y();
+                self.registers[x] = self.delay_timer;
+                self.pc += 2;
+            },
+
+            // Fx15 - LD DT, Vx
+            // Set delay timer = Vx
+            // DT is set equal to the value of Vx.
+            0x15 => {
+                let (x, _) = self.get_regs_x_y();
+                self.delay_timer = self.registers[x];
+                self.pc += 2;
+            },
+
+            // Fx18 - LD ST, Vx
+            // Set sound timer = Vx
+            // ST is set equal to the value of Vx.
+            0x18 => {
+                let (x, _) = self.get_regs_x_y();
+                self.sound_timer = self.registers[x];
+                self.pc += 2;
+            },
+
+            _ => {
+
+            }
+        }
+    }
 }
 
 #[cfg(test)]
