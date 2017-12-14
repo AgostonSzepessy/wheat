@@ -27,11 +27,38 @@ pub struct Chip8 {
     sp: u8,
 }
 
-/// The default address at which the application is loaded at
+// The default address at which the application is loaded at
 const APP_LOCATION: u16 = 0x200;
+
+// Total memory available to Chip8
 const MEMORY_SIZE: usize = 4096;
+
+// Total size of the stock
 const STACK_SIZE: usize = 16;
+
+// Number of registers available
 const NUM_REGISTERS: usize = 16;
+
+// Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to 
+// 0x1FF.
+const HEX_DIGITS: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, // Number: 0
+    0x20, 0x60, 0x20, 0x20, 0x70, // Number: 1
+    0xF0, 0x10, 0xF0, 0x80, 0xF0, // Number: 2
+    0xF0, 0x10, 0xF0, 0x10, 0xF0, // Number: 3
+    0x90, 0x90, 0xF0, 0x10, 0x10, // Number: 4
+    0xF0, 0x80, 0xF0, 0x10, 0xF0, // Number: 5
+    0xF0, 0x80, 0xF0, 0x90, 0xF0, // Number: 6
+    0xF0, 0x10, 0x20, 0x40, 0x40, // Number: 7
+    0xF0, 0x90, 0xF0, 0x90, 0xF0, // Number: 8
+    0xF0, 0x90, 0xF0, 0x10, 0xF0, // Number: 9
+    0xF0, 0x90, 0xF0, 0x90, 0x90, // Letter: A
+    0xE0, 0x90, 0xE0, 0x90, 0xE0, // Letter: B
+    0xF0, 0x80, 0x80, 0x80, 0xF0, // Letter: C
+    0xE0, 0x90, 0x90, 0x90, 0xE0, // Letter: D
+    0xF0, 0x80, 0xF0, 0x80, 0xF0, // Letter: E
+    0xF0, 0x80, 0xF0, 0x80, 0x80, // Letter: F
+];
 
 // Throughout the code, Vx refers to the general purpose registers. There are
 // 15 general purpose registers from V0 to VE. The 16th register is used to
@@ -39,9 +66,15 @@ const NUM_REGISTERS: usize = 16;
 
 impl Chip8 {
     pub fn new() -> Self {
+        let mut memory = vec![0; MEMORY_SIZE];
+
+        for i in 0..HEX_DIGITS.len() {
+            memory[i] = HEX_DIGITS[i];
+        }
+
         Chip8 {
             opcode: 0,
-            memory: vec![0; MEMORY_SIZE],
+            memory: memory,
             ir: 0,
             pc: APP_LOCATION,
             graphics: Graphics::new(),
@@ -457,7 +490,7 @@ impl Chip8 {
 
     /// Takes care of opcodes that are related to input such as checking whether
     /// a key is pressed or not pressed, and waiting until a key is pressed.
-    fn handle_input(&mut self, &input: Input) {
+    fn handle_input(&mut self, input: &Input) {
         match self.opcode & 0x0001 {
             // Ex9E - SKP Vx
             // Skips the next instruction if the key with the value of Vx is 
@@ -466,7 +499,7 @@ impl Chip8 {
             0xE => {
                 let (x, _) = self.get_regs_x_y();
 
-                if input.is_pressed(&x) {
+                if input.is_pressed(&(x as u8)) {
                     self.pc += 2;
                 }
 
@@ -480,7 +513,7 @@ impl Chip8 {
             0x1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !input.is_pressed(&x) {
+                if !input.is_pressed(&(x as u8)) {
                     self.pc += 2;
                 }
 
@@ -497,7 +530,7 @@ impl Chip8 {
                 // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
                 // range
                 for i in 0x0..0x10 {
-                    if input.is_pressed(i) {
+                    if input.is_pressed(&i) {
                         self.registers[x] = i;
                         self.pc += 2;
                         break;
@@ -537,6 +570,28 @@ impl Chip8 {
             0x18 => {
                 let (x, _) = self.get_regs_x_y();
                 self.sound_timer = self.registers[x];
+                self.pc += 2;
+            },
+
+            // Fx1E - ADD I, Vx
+            // Set I = I + Vx
+            // The values of I and Vx are added, and the results are stored in I.
+            0x1E => {
+                let (x, _) = self.get_regs_x_y();
+                self.ir += self.registers[x] as u16;
+                self.pc += 2;
+            },
+
+            // Fx29 - LD F, Vx
+            // Set I = location of sprite for digit Vx.
+            // The value of I is set to the location for the hexadecimal sprite
+            // corresponding to the value of Vx.
+            0x29 => {
+                let (x, _) = self.get_regs_x_y();
+                // Each hex sprite takes up 5 bytes, and they start at address
+                // 0x0, so multiplying the value in Vx by 5 will get us the
+                // address of the sprite
+                self.ir = x as u16 * 5;
                 self.pc += 2;
             },
 

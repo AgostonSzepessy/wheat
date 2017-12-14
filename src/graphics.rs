@@ -38,9 +38,12 @@ impl Graphics {
     }
 
     /// Draws a sprite on the screen, and returns `true` if a pixel on the screen was flipped from
-    /// 1 to 0. `opcode`: Determines position and height of sprite, with position being top left
-    /// corner of the sprite. `ir`: The index register, which contains the area of memory to
-    /// start reading the sprite from. `memory`: The memory from which to read the sprite.
+    /// 1 to 0. 
+    /// `opcode`: Determines position and height of sprite, with position being top left
+    /// corner of the sprite. 
+    /// `ir`: The index register, which contains the area of memory to
+    /// start reading the sprite from. 
+    /// `memory`: The memory from which to read the sprite.
     pub fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool {
         // x and y position, and height of the sprite, with the origin at the 
         // top left corner
