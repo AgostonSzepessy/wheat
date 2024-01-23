@@ -87,8 +87,8 @@ impl Chip8 {
     }
 
     pub fn emulate_cycle(&mut self) {
-        self.opcode = ((self.memory[self.pc as usize] as u16) << 8)
-            | self.memory[self.pc as usize + 1] as u16;
+        self.opcode =
+            ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0

@@ -96,8 +96,8 @@ impl Graphics for GraphicsImpl {
                 // top left corner
                 if memory[(*ir + row) as usize] & (0x80 >> col) != 0 {
                     // If a bit changes from 1 to 0, we need to signal it in the "carry" bit
-                    if self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT)
-                        + ((col + x) % SCREEN_WIDTH)) as usize]
+                    if self.screen
+                        [((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH)) as usize]
                         == 1
                     {
                         pixel_flipped = true;
@@ -105,8 +105,8 @@ impl Graphics for GraphicsImpl {
                     // This math maps a multidimensional array index to a single dimensional array,
                     // and the modulus takes care of wrapping around the screen if the index goes
                     // past it
-                    self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT)
-                        + ((col + x) % SCREEN_WIDTH)) as usize] ^= 1;
+                    self.screen[((((row + y) * SCREEN_WIDTH) % SCREEN_HEIGHT) + ((col + x) % SCREEN_WIDTH))
+                        as usize] ^= 1;
                 }
             }
         }
