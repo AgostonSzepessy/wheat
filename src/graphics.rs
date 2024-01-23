@@ -1,10 +1,4 @@
-/// Screen is 64 pixels wide
-const SCREEN_WIDTH: u16 = 64;
-/// Screen is 32 pixels wide
-const SCREEN_HEIGHT: u16 = 32;
-const SCREEN_SIZE: u16 = SCREEN_WIDTH * SCREEN_HEIGHT;
-/// All sprites are 8 pixels wide
-const SPRITE_WIDTH: u16 = 8;
+use crate::{SCREEN_HEIGHT, SCREEN_SIZE, SCREEN_WIDTH, SPRITE_WIDTH};
 
 pub trait Graphics {
     /// Clears the entire screen with 0s; wipes everything from the screen.
