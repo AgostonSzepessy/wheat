@@ -1,7 +1,7 @@
 use rand;
 use rand::Rng;
 
-use graphics::Graphics;
+use graphics::{Graphics, GraphicsImpl};
 use input::Input;
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ pub struct Chip8 {
     /// The program counter
     pc: u16,
     /// Screen that sprites get drawn on. 64x32 pixels
-    graphics: Graphics,
+    graphics: GraphicsImpl,
     delay_timer: u8,
     registers: Vec<u8>,
     /// When this timer reaches 0, the system's buzzer sounds
@@ -39,7 +39,7 @@ const STACK_SIZE: usize = 16;
 // Number of registers available
 const NUM_REGISTERS: usize = 16;
 
-// Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to 
+// Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
 // 0x1FF.
 const HEX_DIGITS: [u8; 80] = [
     0xF0, 0x90, 0x90, 0x90, 0xF0, // Number: 0
@@ -77,7 +77,7 @@ impl Chip8 {
             memory: memory,
             ir: 0,
             pc: APP_LOCATION,
-            graphics: Graphics::new(),
+            graphics: GraphicsImpl::new(),
             delay_timer: 0,
             registers: vec![0; NUM_REGISTERS],
             sound_timer: 0,
@@ -87,44 +87,45 @@ impl Chip8 {
     }
 
     pub fn emulate_cycle(&mut self) {
-        self.opcode = ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
+        self.opcode = ((self.memory[self.pc as usize] as u16) << 8)
+            | self.memory[self.pc as usize + 1] as u16;
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
             0x0000 => {
                 self.opcode_0x0yyy();
-            },
+            }
 
             // Opcode starts with 0x1
             0x1000 => {
                 self.opcode_0x1yyy();
-            },
+            }
 
             // Opcode starts with 0x2
             0x2000 => {
                 self.opcode_0x2yyy();
-            },
+            }
 
             // 3xkk - SE Vx, byte
             // Skip next instruction if Vx == kk
             0x3000 => {
                 self.opcode_0x3yyy();
-            },
+            }
 
             // Opcodes that start with 0x4
             0x4000 => {
                 self.opcode_0x4yyy();
-            },
+            }
 
             // Opcodes that start with 0x5
             0x5000 => {
                 self.opcode_0x5yyy();
-            },
+            }
 
             // Opcodes that start with 0x6
             0x6000 => {
                 self.opcode_0x6yyy();
-            },
+            }
 
             // Opcodes that start with 0x7
             0x7000 => {
@@ -132,24 +133,24 @@ impl Chip8 {
             }
 
             // Opcodes that start with 0x8
-            0x8000 => { 
+            0x8000 => {
                 self.opcode_0x8yyy();
-            },
+            }
 
             // Opcodes that start with 0x9
             0x9000 => {
                 self.opcode_0x9yyy();
-            },
+            }
 
             // Opcodes that start with 0xA
             0xA000 => {
                 self.opcode_0xayyy();
-            },
+            }
 
             // Opcodes that start with 0xB
             0xB000 => {
                 self.opcode_0xbyyy();
-            },
+            }
 
             // Cxkk - RND, byte
             // Set Vx = random byte AND kk
@@ -157,11 +158,11 @@ impl Chip8 {
             // is then ANDed with kk and the result is stored in Vx.
             0xC000 => {
                 self.opcode_0xcyyy();
-            },
+            }
 
             0xD000 => {
                 self.opcode_0xdyyy();
-            },
+            }
 
             _ => {
                 self.unknown_opcode();
@@ -171,7 +172,10 @@ impl Chip8 {
 
     // Utility function to return the number of registers x and y.
     fn get_regs_x_y(&self) -> (usize, usize) {
-        return (((self.opcode & 0x0F00) >> 8) as usize, ((self.opcode & 0x00F0) >> 4) as usize);
+        return (
+            ((self.opcode & 0x0F00) >> 8) as usize,
+            ((self.opcode & 0x00F0) >> 4) as usize,
+        );
     }
 
     fn unknown_opcode(&mut self) {
@@ -185,7 +189,7 @@ impl Chip8 {
             // Clear the screen
             0x00E0 => {
                 self.graphics.clear();
-            },
+            }
             // Return from subroutine
             0x00EE => {
                 // Restore program counter to previous location on stack
@@ -193,12 +197,12 @@ impl Chip8 {
                 self.pc = self.stack[self.sp as usize];
                 // Restore stack
                 self.sp -= 1;
-            },
+            }
 
             // No other opcodes start with 0x0
             _ => {
                 self.unknown_opcode();
-            },
+            }
         }
     }
 
@@ -223,7 +227,7 @@ impl Chip8 {
     fn opcode_0x3yyy(&mut self) {
         // 3xkk - SE Vx, byte
         // Skip next instruction if Vx == kk
-        
+
         // Get register value and constant
         let (x, _) = self.get_regs_x_y();
         let register_val = self.registers[x];
@@ -255,7 +259,6 @@ impl Chip8 {
         }
 
         self.pc += 2;
-
     }
 
     /// Takes care of opcodes that start with 0x5.
@@ -273,7 +276,6 @@ impl Chip8 {
         }
 
         self.pc += 2;
-
     }
 
     /// Takes care of opcodes that start with 0x6.
@@ -292,13 +294,12 @@ impl Chip8 {
     fn opcode_0x7yyy(&mut self) {
         // 7xkk - ADD Vx, byte
         // Set Vx = Vx + kk
-            // Get value and register
-            let val = (self.opcode & 0x00FF) as u8;
-            let x = ((self.opcode & 0x0F00) >> 8) as usize;
+        // Get value and register
+        let val = (self.opcode & 0x00FF) as u8;
+        let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
-            self.registers[x] += val;
-            self.pc += 2;
-
+        self.registers[x] += val;
+        self.pc += 2;
     }
 
     /// Takes care of opcodes that start with 0x8.
@@ -312,7 +313,7 @@ impl Chip8 {
 
                 self.registers[x] = self.registers[y];
                 self.pc += 2;
-            },
+            }
 
             // 8xy1 - OR Vx, Vy
             // Perform bitwise OR on Vx and Vy and store result in Vx.
@@ -321,7 +322,7 @@ impl Chip8 {
 
                 self.registers[x] |= self.registers[y];
                 self.pc += 2;
-            },
+            }
 
             // 8xy2 - AND Vx, Vy
             // Perform bitwise AND on Vx and Vy and store result in Vx.
@@ -330,7 +331,7 @@ impl Chip8 {
 
                 self.registers[x] &= self.registers[y];
                 self.pc += 2;
-            },
+            }
 
             // 8xy3 - XOR Vx, Vy
             // Performs bitwise XOR on Vx and Vy and stores result in Vx.
@@ -339,7 +340,7 @@ impl Chip8 {
 
                 self.registers[x] ^= self.registers[y];
                 self.pc += 2;
-            },
+            }
 
             // 8xy4 - ADD Vx, Vy
             // Vx = Vx + Vy, set VF = carry
@@ -351,14 +352,13 @@ impl Chip8 {
 
                 if overflow {
                     self.registers[0xF] = 1;
-                }
-                else {
+                } else {
                     self.registers[0xF] = 0;
                 }
 
                 self.registers[x] = val;
                 self.pc += 2;
-            },
+            }
 
             // 8xy5 - SUB Vx, Vy
             // Vx= Vx - Vy, set VF = NOT borrow
@@ -368,15 +368,14 @@ impl Chip8 {
 
                 if self.registers[x] > self.registers[y] {
                     self.registers[0xF] = 1;
-                }
-                else {
+                } else {
                     self.registers[0xF] = 0;
                 }
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
                 self.registers[x] = val;
                 self.pc += 2;
-            },
+            }
 
             // 8xy6 - SHR Vx {, Vy}
             // Set Vx = Vx SHR 1
@@ -389,7 +388,7 @@ impl Chip8 {
 
                 self.registers[x] >>= 1;
                 self.pc += 2;
-            },
+            }
 
             // 8xy7 - SUBN Vx, Vy
             // Set Vx = Vy - Vx, set VF = NOT borrow
@@ -399,15 +398,14 @@ impl Chip8 {
 
                 if self.registers[y] > self.registers[x] {
                     self.registers[0xF] = 1;
-                }
-                else {
+                } else {
                     self.registers[0xF] = 0;
                 }
 
                 let (val, _) = self.registers[y].overflowing_sub(self.registers[x]);
                 self.registers[x] = val;
                 self.pc += 2;
-            },
+            }
 
             // 8xyE - SHL Vx {, Vy}
             // Set Vx = Vx SHL 1
@@ -418,7 +416,7 @@ impl Chip8 {
                 self.registers[0xF] = self.registers[x] & 0x1;
                 self.registers[x] <<= 1;
                 self.pc += 2;
-            },
+            }
 
             // No other opcodes start with 0x8
             _ => {
@@ -467,7 +465,7 @@ impl Chip8 {
         let kk: u8 = (self.opcode & 0x00FF) as u8;
         let (x, _) = self.get_regs_x_y();
 
-        let rand_val = rand::thread_rng().gen_range::<u16>(0, 256) as u8;
+        let rand_val = rand::thread_rng().gen_range(0..256) as u8;
 
         self.registers[x] = rand_val & kk;
         self.pc += 2;
@@ -476,14 +474,13 @@ impl Chip8 {
     /// Takes care of opcodes that start with 0xD
     fn opcode_0xdyyy(&mut self) {
         // Dxyn - DRW Vx, Vy, nibble
-        // Display n-byte sprite starting at memory location I at (Vx, Vy), 
+        // Display n-byte sprite starting at memory location I at (Vx, Vy),
         // set VF = collision
         let flipped = self.graphics.draw(&self.opcode, &self.ir, &self.memory);
 
         if flipped {
             self.registers[0xF] = 1;
-        }
-        else {
+        } else {
             self.registers[0xF] = 0;
         }
     }
@@ -493,7 +490,7 @@ impl Chip8 {
     fn handle_input(&mut self, input: &Input) {
         match self.opcode & 0x0001 {
             // Ex9E - SKP Vx
-            // Skips the next instruction if the key with the value of Vx is 
+            // Skips the next instruction if the key with the value of Vx is
             // pressed. If the key corresponding to the value of Vx is currently
             // in the down position, PC is increased by 2.
             0xE => {
@@ -504,7 +501,7 @@ impl Chip8 {
                 }
 
                 self.pc += 2;
-            },
+            }
 
             // Ex9E - SKNP Vx
             // Skip next instruction if key with value Vx is not pressed. If the
@@ -518,7 +515,7 @@ impl Chip8 {
                 }
 
                 self.pc += 2;
-            },
+            }
 
             // Fx0A - LD Vx, K
             // Wait for a key press, store the value of the key in Vx.
@@ -536,7 +533,7 @@ impl Chip8 {
                         break;
                     }
                 }
-            },
+            }
 
             _ => {
                 self.unknown_opcode();
@@ -553,7 +550,7 @@ impl Chip8 {
                 let (x, _) = self.get_regs_x_y();
                 self.registers[x] = self.delay_timer;
                 self.pc += 2;
-            },
+            }
 
             // Fx15 - LD DT, Vx
             // Set delay timer = Vx
@@ -562,7 +559,7 @@ impl Chip8 {
                 let (x, _) = self.get_regs_x_y();
                 self.delay_timer = self.registers[x];
                 self.pc += 2;
-            },
+            }
 
             // Fx18 - LD ST, Vx
             // Set sound timer = Vx
@@ -571,7 +568,7 @@ impl Chip8 {
                 let (x, _) = self.get_regs_x_y();
                 self.sound_timer = self.registers[x];
                 self.pc += 2;
-            },
+            }
 
             // Fx1E - ADD I, Vx
             // Set I = I + Vx
@@ -580,7 +577,7 @@ impl Chip8 {
                 let (x, _) = self.get_regs_x_y();
                 self.ir += self.registers[x] as u16;
                 self.pc += 2;
-            },
+            }
 
             // Fx29 - LD F, Vx
             // Set I = location of sprite for digit Vx.
@@ -593,11 +590,9 @@ impl Chip8 {
                 // address of the sprite
                 self.ir = x as u16 * 5;
                 self.pc += 2;
-            },
-
-            _ => {
-
             }
+
+            _ => {}
         }
     }
 }
@@ -615,8 +610,8 @@ mod tests {
     /// Tests the arithmetic operations of the Chip8 such as addition,
     /// subtraction, multiplication, division, and bitwise operations.
     /// `name` is the name of the test, `test_fn` is the function to be
-    /// tested, and `values` is a tuple containing the values that the test 
-    /// uses, in this order: the opcode, the initial value in register "x", the 
+    /// tested, and `values` is a tuple containing the values that the test
+    /// uses, in this order: the opcode, the initial value in register "x", the
     /// initial value in register "y", the final value in register "x", and
     /// the expected value of the carry register.
     macro_rules! test_arithmetic {
