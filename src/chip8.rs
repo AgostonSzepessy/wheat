@@ -5,7 +5,7 @@ use crate::input::SdlInput;
 use crate::traits::{Graphics, Input};
 
 #[derive(Debug)]
-pub struct Chip8 {
+pub struct Chip8<G, I> {
     /// Current opcode
     opcode: u16,
     /// The system has 4096 bytes of memory.
@@ -14,8 +14,6 @@ pub struct Chip8 {
     ir: u16,
     /// The program counter
     pc: u16,
-    /// Screen that sprites get drawn on. 64x32 pixels
-    graphics: GraphicsImpl,
     delay_timer: u8,
     registers: Vec<u8>,
     /// When this timer reaches 0, the system's buzzer sounds
@@ -25,6 +23,9 @@ pub struct Chip8 {
     stack: Vec<u16>,
     /// The stack pointer
     sp: u8,
+    /// Screen that sprites get drawn on. 64x32 pixels
+    graphics: G,
+    input: I,
 }
 
 // The default address at which the application is loaded at
@@ -64,8 +65,12 @@ const HEX_DIGITS: [u8; 80] = [
 // 15 general purpose registers from V0 to VE. The 16th register is used to
 // represent the carry flag.
 
-impl Chip8 {
-    pub fn new() -> Self {
+impl<G, I> Chip8<G, I>
+where
+    G: Graphics,
+    I: Input,
+{
+    pub fn new(graphics: G, input: I) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
         for i in 0..HEX_DIGITS.len() {
@@ -77,12 +82,13 @@ impl Chip8 {
             memory: memory,
             ir: 0,
             pc: APP_LOCATION,
-            graphics: GraphicsImpl::new(),
+            graphics: graphics,
             delay_timer: 0,
             registers: vec![0; NUM_REGISTERS],
             sound_timer: 0,
             stack: vec![0; STACK_SIZE],
             sp: 0,
+            input: input,
         }
     }
 
@@ -599,10 +605,14 @@ impl Chip8 {
 
 #[cfg(test)]
 mod tests {
+    use crate::{graphics::GraphicsImpl, input::SdlInput};
+
     use super::Chip8;
 
-    fn create_chip8(opcode: u16) -> Chip8 {
-        let mut chip8 = Chip8::new();
+    fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl, SdlInput> {
+        let graphics = GraphicsImpl::new();
+        let input = SdlInput::new();
+        let mut chip8 = Chip8::new(graphics, input);
         chip8.opcode = opcode;
         chip8
     }
