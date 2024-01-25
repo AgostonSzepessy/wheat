@@ -1,6 +1,7 @@
 use sdl2::{pixels, rect::Rect, render::Canvas, video::Window};
 
-use crate::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use chip8::traits::Display;
+use chip8::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const SCALE_FACTOR: u16 = 20;
 const DISPLAY_WIDTH: u16 = SCREEN_WIDTH * SCALE_FACTOR;
@@ -8,13 +9,13 @@ const DISPLAY_HEIGHT: u16 = SCREEN_HEIGHT * SCALE_FACTOR;
 const TITLE: &str = "Chip 8";
 
 /// The window that displays the Chip 8 buffer to the screen.
-pub struct Display {
+pub struct SdlDisplayDriver {
     canvas: Canvas<Window>,
 }
 
-impl Display {
+impl SdlDisplayDriver {
     /// Creates a new display window and clears it to black.
-    pub fn new(sdl_context: &sdl2::Sdl) -> Display {
+    pub fn new(sdl_context: &sdl2::Sdl) -> SdlDisplayDriver {
         let video_subsystem = sdl_context.video().unwrap();
         let window = video_subsystem
             .window(TITLE, DISPLAY_WIDTH as u32, DISPLAY_HEIGHT as u32)
@@ -30,11 +31,10 @@ impl Display {
 
         Self { canvas }
     }
+}
 
-    /// Draws the specified `buffer`. The buffer is expected to be
-    /// made up of `1`s and `0`s. `1`s are drawn as white and `0`s
-    /// are drawn as black.
-    pub fn draw(&mut self, buffer: &Vec<u8>) {
+impl Display for SdlDisplayDriver {
+    fn draw(&mut self, buffer: &Vec<u8>) {
         for row in 0..SCREEN_HEIGHT {
             for col in 0..SCREEN_WIDTH {
                 let x = row * SCALE_FACTOR;

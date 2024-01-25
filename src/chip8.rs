@@ -1,8 +1,8 @@
-use rand;
 use rand::Rng;
 
-use graphics::{Graphics, GraphicsImpl};
-use input::Input;
+use crate::graphics::GraphicsImpl;
+use crate::input::Input;
+use crate::traits::Graphics;
 
 #[derive(Debug)]
 pub struct Chip8 {
