@@ -1,3 +1,4 @@
+pub(self) use crate::traits::Input;
 use sdl2::keyboard::Keycode;
 
 const NUM_KEYS: usize = 16;
@@ -14,21 +15,25 @@ const NUM_KEYS: usize = 16;
 ///
 /// based off of this diagram: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
 #[derive(Debug)]
-pub struct Input {
+pub struct SdlInput {
     keys: Vec<bool>,
 }
 
-impl Input {
+impl SdlInput {
     /// Creates a new `Input` with all key states set to `false`.
     pub fn new() -> Self {
-        Input {
+        SdlInput {
             keys: vec![false; NUM_KEYS],
         }
     }
+}
+
+impl Input for SdlInput {
+    type Key = Keycode;
 
     /// Updates the state of the keys. `key` is the key to update, and `state`
     /// is the new state of the `key`.
-    pub fn update(&mut self, key: &Keycode, state: bool) {
+    fn update(&mut self, key: &Keycode, state: bool) {
         match *key {
             Keycode::Num1 => self.keys[0x1] = state,
             Keycode::Num2 => self.keys[0x2] = state,
@@ -46,7 +51,7 @@ impl Input {
             Keycode::X => self.keys[0x0] = state,
             Keycode::C => self.keys[0xB] = state,
             Keycode::V => self.keys[0xF] = state,
-            _ => { }
+            _ => {}
         }
     }
 
@@ -55,19 +60,21 @@ impl Input {
     /// To check if `Num1` is pressed:
     ///
     /// ```
-    /// use chip8::input::Input;
+    /// use chip8::traits::Input;
+    /// use chip8::input::SdlInput;
     ///
-    /// let input = Input::new();
+    /// let input = SdlInput::new();
     /// assert_eq!(input.is_pressed(&0x0), false);
     /// ```
-    pub fn is_pressed(&self, key: &u8) -> bool {
+    fn is_pressed(&self, key: &u8) -> bool {
         self.keys[*key as usize]
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Input;
+    use super::SdlInput;
+    use crate::traits::Input;
     use sdl2::keyboard::Keycode;
 
     macro_rules! update_test {
@@ -76,7 +83,7 @@ mod tests {
                 #[test]
                 fn $name() {
                     let (input_key, input_val) = $value;
-                    let mut input = Input::new();
+                    let mut input = SdlInput::new();
                     input.update(&input_key, true);
                     assert_eq!(input.is_pressed(&input_val), true);
                 }

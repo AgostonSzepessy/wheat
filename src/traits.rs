@@ -20,3 +20,26 @@ pub trait Display {
     /// are drawn as black.
     fn draw(&mut self, buffer: &Vec<u8>);
 }
+
+/// Keeps track of the state of the keys. Chip8 uses 16 keys; this implementation
+/// relies on  the following mapping:
+///
+/// | Keys   | Keys   | Keys   | Keys   |
+/// |--------|--------|--------|--------|
+/// | 1 (0x1) | 2 (0x2) | 3 (0x3) | 4 (0xC) |
+/// | Q (0x4) | W (0x5) | E (0x6) | R (0xD) |
+/// | A (0x7) | S (0x8) | D (0x9) | F (0xE) |
+/// | Z (0xA) | X (0x0) | C (0xB) | V (0xF) |
+///
+/// based off of this diagram: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
+pub trait Input {
+    type Key;
+
+    /// Updates the state of the keys. `key` is the key to update, and `state`
+    /// is the new state of the `key`.
+    fn update(&mut self, key: &Self::Key, state: bool);
+
+    /// Returns the state of the specified key. The hex code that the key is
+    /// mapped to is used to access its state.
+    fn is_pressed(&self, key: &u8) -> bool;
+}

@@ -1,8 +1,8 @@
 use rand::Rng;
 
 use crate::graphics::GraphicsImpl;
-use crate::input::Input;
-use crate::traits::Graphics;
+use crate::input::SdlInput;
+use crate::traits::{Graphics, Input};
 
 #[derive(Debug)]
 pub struct Chip8 {
@@ -487,7 +487,7 @@ impl Chip8 {
 
     /// Takes care of opcodes that are related to input such as checking whether
     /// a key is pressed or not pressed, and waiting until a key is pressed.
-    fn handle_input(&mut self, input: &Input) {
+    fn handle_input(&mut self, input: &SdlInput) {
         match self.opcode & 0x0001 {
             // Ex9E - SKP Vx
             // Skips the next instruction if the key with the value of Vx is
