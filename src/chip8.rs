@@ -10,7 +10,7 @@ pub struct Chip8<G, I> {
     opcode: u16,
     /// The system has 4096 bytes of memory.
     memory: Vec<u8>,
-    /// The index register
+    /// The index register (I)
     ir: u16,
     /// The program counter
     pc: u16,
@@ -39,6 +39,9 @@ const STACK_SIZE: usize = 16;
 
 // Number of registers available
 const NUM_REGISTERS: usize = 16;
+
+// Register size in bytes.
+const REG_SIZE: u16 = 1;
 
 // Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
 // 0x1FF.
@@ -598,7 +601,58 @@ where
                 self.pc += 2;
             }
 
-            _ => {}
+            // Fx33 - LD B, Vx
+            // Store BCD representation of Vx in memory locations I, I+1, and I+2.
+            // The interpreter takes the decimal value of Vx, and places the hundreds digit
+            // in memory at location in I, the tens digit at location I+1, and the ones digit at location I+2.
+            0x33 => {
+                let (x, _) = self.get_regs_x_y();
+                let val = self.registers[x];
+
+                let hundreds = (val / 100) as u8;
+                let tens = ((val / 10) % 10) as u8;
+                let ones = (val % 10) as u8;
+
+                self.memory[self.ir as usize] = hundreds;
+                self.memory[self.ir as usize + 1] = tens;
+                self.memory[self.ir as usize + 2] = ones;
+
+                self.pc += 2;
+            }
+
+            // Fx55 - LD [I], Vx
+            // Store registers V0 through Vx in memory starting at location I.
+            // The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
+            0x55 => {
+                let (x, _) = self.get_regs_x_y();
+                let mut addr = self.ir;
+
+                for i in 0..=x {
+                    self.memory[addr as usize] = self.registers[i];
+                    addr += REG_SIZE;
+                }
+
+                self.pc += 2;
+            }
+
+            // Fx65 - LD Vx, [I]
+            // Read registers V0 through Vx from memory starting at location I.
+            // The interpreter reads values from memory starting at location I into registers V0 through Vx.
+            0x65 => {
+                let (x, _) = self.get_regs_x_y();
+                let mut addr = self.ir;
+
+                for i in 0..=x {
+                    self.registers[i] = self.memory[addr as usize];
+                    addr += REG_SIZE;
+                }
+
+                self.pc += 2;
+            }
+
+            _ => {
+                self.unknown_opcode();
+            }
         }
     }
 }
@@ -652,6 +706,61 @@ mod tests {
         let (x, y) = chip8.get_regs_x_y();
         assert_eq!(x, 0xF);
         assert_eq!(y, 0xA);
+    }
+
+    #[test]
+    fn test_bcd() {
+        let mut chip8 = create_chip8(0xF133);
+        let (x, _) = chip8.get_regs_x_y();
+
+        chip8.registers[x] = 123;
+        chip8.ir = 0x500;
+
+        chip8.opcode_0xfyyy();
+        assert_eq!(chip8.memory[chip8.ir as usize], 1);
+        assert_eq!(chip8.memory[chip8.ir as usize + 1], 2);
+        assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
+    }
+
+    #[test]
+    fn test_copy_to_mem() {
+        let mut chip8 = create_chip8(0xF555);
+        let (x, _) = chip8.get_regs_x_y();
+
+        for i in 0..=5 {
+            chip8.registers[i] = (i + 1) as u8;
+        }
+
+        chip8.ir = 0x500;
+
+        chip8.opcode_0xfyyy();
+
+        assert_eq!(chip8.memory[chip8.ir as usize], 1);
+        assert_eq!(chip8.memory[chip8.ir as usize + 1], 2);
+        assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
+        assert_eq!(chip8.memory[chip8.ir as usize + 3], 4);
+        assert_eq!(chip8.memory[chip8.ir as usize + 4], 5);
+        assert_eq!(chip8.memory[chip8.ir as usize + 5], 6);
+    }
+
+    #[test]
+    fn test_copy_from_mem() {
+        let mut chip8 = create_chip8(0xF565);
+
+        chip8.ir = 0x500;
+
+        for i in 0..=5 {
+            chip8.memory[chip8.ir as usize + i] = (i + 1) as u8;
+        }
+
+        chip8.opcode_0xfyyy();
+
+        assert_eq!(chip8.registers[0], 1);
+        assert_eq!(chip8.registers[1], 2);
+        assert_eq!(chip8.registers[2], 3);
+        assert_eq!(chip8.registers[3], 4);
+        assert_eq!(chip8.registers[4], 5);
+        assert_eq!(chip8.registers[5], 6);
     }
 
     // First number is register A, second is register B
