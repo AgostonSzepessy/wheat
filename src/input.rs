@@ -1,5 +1,7 @@
 pub(self) use crate::traits::Input;
+use crate::Key;
 use sdl2::keyboard::Keycode;
+use thiserror::Error;
 
 const NUM_KEYS: usize = 16;
 
@@ -28,31 +30,43 @@ impl SdlInput {
     }
 }
 
-impl Input for SdlInput {
-    type Key = Keycode;
+#[derive(Debug, Error)]
+pub enum InputError {
+    #[error("Unsupported key")]
+    UnsupportedKey,
+}
 
+impl TryFrom<Keycode> for Key {
+    type Error = InputError;
+
+    fn try_from(value: Keycode) -> Result<Self, Self::Error> {
+        match value {
+            Keycode::Num1 => Ok(Key::Num1),
+            Keycode::Num2 => Ok(Key::Num2),
+            Keycode::Num3 => Ok(Key::Num3),
+            Keycode::Num4 => Ok(Key::C),
+            Keycode::Q => Ok(Key::Num4),
+            Keycode::W => Ok(Key::Num5),
+            Keycode::E => Ok(Key::Num6),
+            Keycode::R => Ok(Key::D),
+            Keycode::A => Ok(Key::Num7),
+            Keycode::S => Ok(Key::Num8),
+            Keycode::D => Ok(Key::Num9),
+            Keycode::F => Ok(Key::E),
+            Keycode::Z => Ok(Key::A),
+            Keycode::X => Ok(Key::Num0),
+            Keycode::C => Ok(Key::B),
+            Keycode::V => Ok(Key::F),
+            _ => Err(InputError::UnsupportedKey),
+        }
+    }
+}
+
+impl Input for SdlInput {
     /// Updates the state of the keys. `key` is the key to update, and `state`
     /// is the new state of the `key`.
-    fn update(&mut self, key: &Keycode, state: bool) {
-        match *key {
-            Keycode::Num1 => self.keys[0x1] = state,
-            Keycode::Num2 => self.keys[0x2] = state,
-            Keycode::Num3 => self.keys[0x3] = state,
-            Keycode::Num4 => self.keys[0xC] = state,
-            Keycode::Q => self.keys[0x4] = state,
-            Keycode::W => self.keys[0x5] = state,
-            Keycode::E => self.keys[0x6] = state,
-            Keycode::R => self.keys[0xD] = state,
-            Keycode::A => self.keys[0x7] = state,
-            Keycode::S => self.keys[0x8] = state,
-            Keycode::D => self.keys[0x9] = state,
-            Keycode::F => self.keys[0xE] = state,
-            Keycode::Z => self.keys[0xA] = state,
-            Keycode::X => self.keys[0x0] = state,
-            Keycode::C => self.keys[0xB] = state,
-            Keycode::V => self.keys[0xF] = state,
-            _ => {}
-        }
+    fn update(&mut self, key: Key, state: bool) {
+        self.keys[key as usize] = state;
     }
 
     /// Returns the state of the specified key. The hex code that the key is
@@ -62,19 +76,20 @@ impl Input for SdlInput {
     /// ```
     /// use chip8::traits::Input;
     /// use chip8::input::SdlInput;
+    /// use chip8::Key;
     ///
     /// let input = SdlInput::new();
-    /// assert_eq!(input.is_pressed(&0x0), false);
+    /// assert_eq!(input.is_pressed(Key::Num0), false);
     /// ```
-    fn is_pressed(&self, key: &u8) -> bool {
-        self.keys[*key as usize]
+    fn is_pressed(&self, key: Key) -> bool {
+        self.keys[key as usize]
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::SdlInput;
-    use crate::traits::Input;
+    use crate::{traits::Input, Key};
     use sdl2::keyboard::Keycode;
 
     macro_rules! update_test {
@@ -84,29 +99,29 @@ mod tests {
                 fn $name() {
                     let (input_key, input_val) = $value;
                     let mut input = SdlInput::new();
-                    input.update(&input_key, true);
-                    assert_eq!(input.is_pressed(&input_val), true);
+                    input.update(input_key.try_into().unwrap(), true);
+                    assert_eq!(input.is_pressed(input_val.try_into().unwrap()), true);
                 }
             )*
         }
     }
 
     update_test! {
-        test_num1: (Keycode::Num1, 0x1),
-        test_num2: (Keycode::Num2, 0x2),
-        test_num3: (Keycode::Num3, 0x3),
-        test_num4: (Keycode::Num4, 0xC),
-        test_q: (Keycode::Q, 0x4),
-        test_w: (Keycode::W, 0x5),
-        test_e: (Keycode::E, 0x6),
-        test_r: (Keycode::R, 0xD),
-        test_a: (Keycode::A, 0x7),
-        test_s: (Keycode::S, 0x8),
-        test_d: (Keycode::D, 0x9),
-        test_f: (Keycode::F, 0xE),
-        test_z: (Keycode::Z, 0xA),
-        test_x: (Keycode::X, 0x0),
-        test_c: (Keycode::C, 0xB),
-        test_v: (Keycode::V, 0xF),
+        test_num1: (Keycode::Num1, Key::Num1),
+        test_num2: (Keycode::Num2, Key::Num2),
+        test_num3: (Keycode::Num3, Key::Num3),
+        test_num4: (Keycode::Num4, Key::C),
+        test_q: (Keycode::Q, Key::Num4),
+        test_w: (Keycode::W, Key::Num5),
+        test_e: (Keycode::E, Key::Num6),
+        test_r: (Keycode::R, Key::D),
+        test_a: (Keycode::A, Key::Num7),
+        test_s: (Keycode::S, Key::Num8),
+        test_d: (Keycode::D, Key::Num9),
+        test_f: (Keycode::F, Key::E),
+        test_z: (Keycode::Z, Key::A),
+        test_x: (Keycode::X, Key::Num0),
+        test_c: (Keycode::C, Key::B),
+        test_v: (Keycode::V, Key::F),
     }
 }

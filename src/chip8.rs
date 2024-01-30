@@ -505,7 +505,7 @@ where
             0xE => {
                 let (x, _) = self.get_regs_x_y();
 
-                if input.is_pressed(&(x as u8)) {
+                if input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += 2;
                 }
 
@@ -519,7 +519,7 @@ where
             0x1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !input.is_pressed(&(x as u8)) {
+                if !input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += 2;
                 }
 
@@ -535,8 +535,8 @@ where
 
                 // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
                 // range
-                for i in 0x0..0x10 {
-                    if input.is_pressed(&i) {
+                for i in 0x0..=0xF {
+                    if input.is_pressed((i as u8).try_into().unwrap()) {
                         self.registers[x] = i;
                         self.pc += 2;
                         break;
