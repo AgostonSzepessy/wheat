@@ -820,6 +820,32 @@ mod tests {
 
     }
 
+    #[test]
+    fn test_0x5yyy_eq() {
+        let mut chip8 = create_chip8(0x5120);
+        let (x, y) = chip8.get_regs_x_y();
+
+        chip8.registers[x] = 0x10;
+        chip8.registers[y] = 0x10;
+
+        chip8.opcode_0x5yyy();
+
+        assert_eq!(chip8.pc, 0x204);
+    }
+
+    #[test]
+    fn test_0x5yyy_neq() {
+        let mut chip8 = create_chip8(0x5120);
+        let (x, y) = chip8.get_regs_x_y();
+
+        chip8.registers[x] = 0x11;
+        chip8.registers[y] = 0x10;
+
+        chip8.opcode_0x5yyy();
+
+        assert_eq!(chip8.pc, 0x202);
+    }
+
     // First number is register A, second is register B
     test_arithmetic! {
         test_store: (opcode_0x8yyy, (0x8AB0, 1, 2, 2, 0)),
