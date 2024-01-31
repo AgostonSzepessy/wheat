@@ -43,6 +43,8 @@ const NUM_REGISTERS: usize = 16;
 // Register size in bytes.
 const REG_SIZE: u16 = 1;
 
+const OPCODE_SIZE: u16 = 2;
+
 // Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
 // 0x1FF.
 const HEX_DIGITS: [u8; 80] = [
@@ -233,10 +235,10 @@ where
     /// Takes care of opcodes that start with 0x2.
     fn opcode_0x2yyy(&mut self) {
         // 0x2adr - Call subroutine at adr
-        // Put program counter on stack and then jump to subroutine
-        // location
+        // Put instruction after program counter on stack and then jump to subroutine
+        // location. This prevents the VM from entering into an endless loop.
+        self.stack[self.sp as usize] = self.pc + OPCODE_SIZE;
         self.sp += 1;
-        self.stack[self.sp as usize] = self.pc;
         self.pc = self.opcode & 0x0FFF;
     }
 
@@ -769,6 +771,25 @@ mod tests {
         assert_eq!(chip8.registers[3], 4);
         assert_eq!(chip8.registers[4], 5);
         assert_eq!(chip8.registers[5], 6);
+    }
+
+    #[test]
+    fn test_1nnn_opcode() {
+        let mut chip8 = create_chip8(0x1200);
+        chip8.pc = 0x300;
+
+        chip8.opcode_0x1yyy();
+        assert_eq!(chip8.pc, 0x200);
+    }
+
+    #[test]
+    fn test_2nnn_opcode() {
+        let mut chip8 = create_chip8(0x2300);
+        chip8.opcode_0x2yyy();
+
+        assert_eq!(chip8.pc, 0x300);
+        assert_eq!(chip8.stack[0], 0x202);
+        assert_eq!(chip8.sp, 1);
     }
 
     // First number is register A, second is register B
