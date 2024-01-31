@@ -173,6 +173,14 @@ where
                 self.opcode_0xdyyy();
             }
 
+            0xE000 => {
+                self.opcode_0xeyyy();
+            }
+
+            0xF000 => {
+                self.opcode_0xfyyy();
+            }
+
             _ => {
                 self.unknown_opcode();
             }
@@ -496,52 +504,34 @@ where
 
     /// Takes care of opcodes that are related to input such as checking whether
     /// a key is pressed or not pressed, and waiting until a key is pressed.
-    fn handle_input(&mut self, input: &SdlInput) {
-        match self.opcode & 0x0001 {
+    fn opcode_0xeyyy(&mut self) {
+        match self.opcode & 0xFF {
             // Ex9E - SKP Vx
             // Skips the next instruction if the key with the value of Vx is
             // pressed. If the key corresponding to the value of Vx is currently
             // in the down position, PC is increased by 2.
-            0xE => {
+            0x9E => {
                 let (x, _) = self.get_regs_x_y();
 
-                if input.is_pressed((x as u8).try_into().unwrap()) {
+                if self.input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += 2;
                 }
 
                 self.pc += 2;
             }
 
-            // Ex9E - SKNP Vx
+            // ExA1 - SKNP Vx
             // Skip next instruction if key with value Vx is not pressed. If the
             // key with value Vx is not pressed, the program counter is incremented
             // by 2.
-            0x1 => {
+            0xA1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !input.is_pressed((x as u8).try_into().unwrap()) {
+                if !self.input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += 2;
                 }
 
                 self.pc += 2;
-            }
-
-            // Fx0A - LD Vx, K
-            // Wait for a key press, store the value of the key in Vx.
-            // All execution stops until a key is pressed, then the value
-            // of that key is stored in Vx.
-            0xA => {
-                let (x, _) = self.get_regs_x_y();
-
-                // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
-                // range
-                for i in 0x0..=0xF {
-                    if input.is_pressed((i as u8).try_into().unwrap()) {
-                        self.registers[x] = i;
-                        self.pc += 2;
-                        break;
-                    }
-                }
             }
 
             _ => {
@@ -559,6 +549,24 @@ where
                 let (x, _) = self.get_regs_x_y();
                 self.registers[x] = self.delay_timer;
                 self.pc += 2;
+            }
+
+            // Fx0A - LD Vx, K
+            // Wait for a key press, store the value of the key in Vx.
+            // All execution stops until a key is pressed, then the value
+            // of that key is stored in Vx.
+            0x0A => {
+                let (x, _) = self.get_regs_x_y();
+
+                // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
+                // range
+                for i in 0x0..=0xF {
+                    if self.input.is_pressed((i as u8).try_into().unwrap()) {
+                        self.registers[x] = i;
+                        self.pc += 2;
+                        break;
+                    }
+                }
             }
 
             // Fx15 - LD DT, Vx
