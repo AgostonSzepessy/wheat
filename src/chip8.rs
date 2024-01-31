@@ -851,9 +851,21 @@ mod tests {
         let mut chip8 = create_chip8(0x6120);
         let (x, _) = chip8.get_regs_x_y();
 
-        chip8.registers[x] = 0x20;
+        chip8.registers[x] = 0;
+        chip8.opcode_0x6yyy();
 
         assert_eq!(chip8.registers[1], 0x20);
+    }
+
+    #[test]
+    fn test_0x7yyy_opcode() {
+        let mut chip8 = create_chip8(0x7120);
+        let (x, _) = chip8.get_regs_x_y();
+
+        chip8.registers[x] = 0x10;
+        chip8.opcode_0x7yyy();
+
+        assert_eq!(chip8.registers[1], 0x30);
     }
 
     // First number is register A, second is register B
