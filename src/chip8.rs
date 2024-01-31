@@ -792,7 +792,7 @@ mod tests {
         assert_eq!(chip8.sp, 1);
     }
 
-    macro_rules! test_skip_opcodes {
+    macro_rules! test_skip_value_opcodes {
         ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
             $(
                 #[test]
@@ -812,7 +812,7 @@ mod tests {
 
     // First number is opcode, second is register value, third is
     // expected program counter value
-    test_skip_opcodes! {
+    test_skip_value_opcodes! {
         test_0x3yyy_eq: (opcode_0x3yyy, (0x3012, 0x12, 0x204)),
         test_0x3yyy_neq: (opcode_0x3yyy, (0x3012, 0x10, 0x202)),
         test_0x4yyy_eq: (opcode_0x4yyy, (0x3012, 0x12, 0x202)),
@@ -820,30 +820,30 @@ mod tests {
 
     }
 
-    #[test]
-    fn test_0x5yyy_eq() {
-        let mut chip8 = create_chip8(0x5120);
-        let (x, y) = chip8.get_regs_x_y();
+    macro_rules! test_skip_register_opcodes {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg1_start_val, reg2_start_val, ending_sp) = $values;
+                    let mut chip8 = create_chip8(opcode);
+                    let (x, y) = chip8.get_regs_x_y();
 
-        chip8.registers[x] = 0x10;
-        chip8.registers[y] = 0x10;
+                    chip8.registers[x] = reg1_start_val;
+                    chip8.registers[y] = reg2_start_val;
 
-        chip8.opcode_0x5yyy();
-
-        assert_eq!(chip8.pc, 0x204);
+                    chip8.$test_fn();
+                    assert_eq!(chip8.pc, ending_sp);
+                }
+            )*
+        }
     }
 
-    #[test]
-    fn test_0x5yyy_neq() {
-        let mut chip8 = create_chip8(0x5120);
-        let (x, y) = chip8.get_regs_x_y();
-
-        chip8.registers[x] = 0x11;
-        chip8.registers[y] = 0x10;
-
-        chip8.opcode_0x5yyy();
-
-        assert_eq!(chip8.pc, 0x202);
+    test_skip_register_opcodes! {
+        test_0x5yyy_eq: (opcode_0x5yyy, (0x5120, 0x10, 0x10, 0x204)),
+        test_0x5yyy_neq: (opcode_0x5yyy, (0x5120, 0x11, 0x10, 0x202)),
+        test_0x9yyy_eq: (opcode_0x9yyy, (0x5120, 0x10, 0x10, 0x202)),
+        test_0x9yyy_neq: (opcode_0x9yyy, (0x5120, 0x11, 0x10, 0x204)),
     }
 
     #[test]
