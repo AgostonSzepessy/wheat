@@ -792,6 +792,34 @@ mod tests {
         assert_eq!(chip8.sp, 1);
     }
 
+    macro_rules! test_skip_opcodes {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg_start_val, ending_sp) = $values;
+                    let mut chip8 = create_chip8(opcode);
+                    let (x, _) = chip8.get_regs_x_y();
+
+                    chip8.registers[x] = reg_start_val;
+
+                    chip8.$test_fn();
+                    assert_eq!(chip8.pc, ending_sp);
+                }
+            )*
+        }
+    }
+
+    // First number is opcode, second is register value, third is
+    // expected program counter value
+    test_skip_opcodes! {
+        test_0x3yyy_eq: (opcode_0x3yyy, (0x3012, 0x12, 0x204)),
+        test_0x3yyy_neq: (opcode_0x3yyy, (0x3012, 0x10, 0x202)),
+        test_0x4yyy_eq: (opcode_0x4yyy, (0x3012, 0x12, 0x202)),
+        test_0x4yyy_neq: (opcode_0x4yyy, (0x3012, 0x10, 0x204)),
+
+    }
+
     // First number is register A, second is register B
     test_arithmetic! {
         test_store: (opcode_0x8yyy, (0x8AB0, 1, 2, 2, 0)),
