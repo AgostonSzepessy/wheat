@@ -876,6 +876,16 @@ mod tests {
         assert_eq!(chip8.ir, 0x120);
     }
 
+    #[test]
+    fn test_0xbyyy() {
+        let mut chip8 = create_chip8(0xB120);
+        chip8.registers[0] = 0xFF;
+
+        chip8.opcode_0xbyyy();
+
+        assert_eq!(chip8.pc, 0x120 + 0xFF);
+    }
+
     // First number is register A, second is register B
     test_arithmetic! {
         test_store: (opcode_0x8yyy, (0x8AB0, 1, 2, 2, 0)),
