@@ -199,7 +199,7 @@ where
 
     fn unknown_opcode(&mut self) {
         println!("unknown opcode: {:X}", self.opcode);
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x0.
@@ -255,10 +255,10 @@ where
         // If equal, skip next instruction (increment program
         // counter by 2)
         if register_val == comp_val {
-            self.pc += 2;
+            self.pc += OPCODE_SIZE;
         }
 
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x4.
@@ -274,10 +274,10 @@ where
         // If not equal, skip next instruction (increment program
         // counter by 2)
         if register_val != comp_val {
-            self.pc += 2;
+            self.pc += OPCODE_SIZE;
         }
 
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x5.
@@ -291,10 +291,10 @@ where
         // If values are equal, skip next instruction (increment
         // program counter by 2)
         if vx_val == vy_val {
-            self.pc += 2;
+            self.pc += OPCODE_SIZE;
         }
 
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x6.
@@ -306,7 +306,7 @@ where
 
         // Set register to value
         self.registers[x] = val;
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x7.
@@ -318,7 +318,7 @@ where
         let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
         self.registers[x] += val;
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0x8.
@@ -331,7 +331,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] = self.registers[y];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy1 - OR Vx, Vy
@@ -340,7 +340,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] |= self.registers[y];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy2 - AND Vx, Vy
@@ -349,7 +349,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] &= self.registers[y];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy3 - XOR Vx, Vy
@@ -358,7 +358,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] ^= self.registers[y];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy4 - ADD Vx, Vy
@@ -376,7 +376,7 @@ where
                 }
 
                 self.registers[x] = val;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy5 - SUB Vx, Vy
@@ -393,7 +393,7 @@ where
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
                 self.registers[x] = val;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy6 - SHR Vx {, Vy}
@@ -406,7 +406,7 @@ where
                 self.registers[0xF] = self.registers[x] & 0x1;
 
                 self.registers[x] >>= 1;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xy7 - SUBN Vx, Vy
@@ -423,7 +423,7 @@ where
 
                 let (val, _) = self.registers[y].overflowing_sub(self.registers[x]);
                 self.registers[x] = val;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // 8xyE - SHL Vx {, Vy}
@@ -434,7 +434,7 @@ where
 
                 self.registers[0xF] = self.registers[x] & 0x1;
                 self.registers[x] <<= 1;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // No other opcodes start with 0x8
@@ -451,10 +451,10 @@ where
         let (x, y) = self.get_regs_x_y();
 
         if self.registers[x] != self.registers[y] {
-            self.pc += 2;
+            self.pc += OPCODE_SIZE;
         }
 
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0xA
@@ -464,7 +464,7 @@ where
         // Get address and set index register
         let val = self.opcode & 0x0FFF;
         self.ir = val;
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0xB
@@ -487,7 +487,7 @@ where
         let rand_val = rand::thread_rng().gen_range(0..256) as u8;
 
         self.registers[x] = rand_val & kk;
-        self.pc += 2;
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that start with 0xD
@@ -516,10 +516,10 @@ where
                 let (x, _) = self.get_regs_x_y();
 
                 if self.input.is_pressed((x as u8).try_into().unwrap()) {
-                    self.pc += 2;
+                    self.pc += OPCODE_SIZE;
                 }
 
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // ExA1 - SKNP Vx
@@ -530,10 +530,10 @@ where
                 let (x, _) = self.get_regs_x_y();
 
                 if !self.input.is_pressed((x as u8).try_into().unwrap()) {
-                    self.pc += 2;
+                    self.pc += OPCODE_SIZE;
                 }
 
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             _ => {
@@ -550,7 +550,7 @@ where
             0x07 => {
                 let (x, _) = self.get_regs_x_y();
                 self.registers[x] = self.delay_timer;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx0A - LD Vx, K
@@ -565,7 +565,7 @@ where
                 for i in 0x0..=0xF {
                     if self.input.is_pressed((i as u8).try_into().unwrap()) {
                         self.registers[x] = i;
-                        self.pc += 2;
+                        self.pc += OPCODE_SIZE;
                         break;
                     }
                 }
@@ -577,7 +577,7 @@ where
             0x15 => {
                 let (x, _) = self.get_regs_x_y();
                 self.delay_timer = self.registers[x];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx18 - LD ST, Vx
@@ -586,7 +586,7 @@ where
             0x18 => {
                 let (x, _) = self.get_regs_x_y();
                 self.sound_timer = self.registers[x];
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx1E - ADD I, Vx
@@ -595,7 +595,7 @@ where
             0x1E => {
                 let (x, _) = self.get_regs_x_y();
                 self.ir += self.registers[x] as u16;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx29 - LD F, Vx
@@ -608,7 +608,7 @@ where
                 // 0x0, so multiplying the value in Vx by 5 will get us the
                 // address of the sprite
                 self.ir = x as u16 * 5;
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx33 - LD B, Vx
@@ -627,7 +627,7 @@ where
                 self.memory[self.ir as usize + 1] = tens;
                 self.memory[self.ir as usize + 2] = ones;
 
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx55 - LD [I], Vx
@@ -642,7 +642,7 @@ where
                     addr += REG_SIZE;
                 }
 
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx65 - LD Vx, [I]
@@ -657,7 +657,7 @@ where
                     addr += REG_SIZE;
                 }
 
-                self.pc += 2;
+                self.pc += OPCODE_SIZE;
             }
 
             _ => {
