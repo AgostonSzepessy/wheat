@@ -1,7 +1,10 @@
+use std::sync::mpsc::Receiver;
+
 use rand::Rng;
 
 use crate::graphics::GraphicsImpl;
 use crate::input::SdlInput;
+use crate::timer::TimerOperation;
 use crate::traits::{Graphics, Input};
 
 #[derive(Debug)]
@@ -26,6 +29,7 @@ pub struct Chip8<G, I> {
     /// Screen that sprites get drawn on. 64x32 pixels
     graphics: G,
     input: I,
+    timer_rx: Receiver<TimerOperation>,
 }
 
 // The default address at which the application is loaded at
@@ -75,7 +79,7 @@ where
     G: Graphics,
     I: Input,
 {
-    pub fn new(graphics: G, input: I) -> Self {
+    pub fn new(graphics: G, input: I, timer_rx: Receiver<TimerOperation>) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
         for i in 0..HEX_DIGITS.len() {
@@ -84,20 +88,38 @@ where
 
         Chip8 {
             opcode: 0,
-            memory: memory,
+            memory,
             ir: 0,
             pc: APP_LOCATION,
-            graphics: graphics,
+            graphics,
             delay_timer: 0,
             registers: vec![0; NUM_REGISTERS],
             sound_timer: 0,
             stack: vec![0; STACK_SIZE],
             sp: 0,
-            input: input,
+            input,
+            timer_rx,
         }
     }
 
-    pub fn emulate_cycle(&mut self) {
+    pub fn tick(&mut self) {
+        self.emulate_cycle();
+
+        // If there's a timer updated, update the timers
+        while let Ok(timer_operation) = self.timer_rx.try_recv() {
+            match timer_operation {
+                TimerOperation::Decrement(val) => {
+                    self.sound_timer = self.sound_timer.saturating_sub(val);
+                    self.delay_timer = self.delay_timer.saturating_sub(val);
+                }
+                _ => {
+                    println!("Unsupported timer operation");
+                }
+            }
+        }
+    }
+
+    fn emulate_cycle(&mut self) {
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
@@ -669,6 +691,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::sync::mpsc;
+
     use crate::{graphics::GraphicsImpl, input::SdlInput};
 
     use super::Chip8;
@@ -676,7 +700,8 @@ mod tests {
     fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl, SdlInput> {
         let graphics = GraphicsImpl::new();
         let input = SdlInput::new();
-        let mut chip8 = Chip8::new(graphics, input);
+        let (_, timer_rx) = mpsc::channel();
+        let mut chip8 = Chip8::new(graphics, input, timer_rx);
         chip8.opcode = opcode;
         chip8
     }
@@ -735,7 +760,6 @@ mod tests {
     #[test]
     fn test_copy_to_mem() {
         let mut chip8 = create_chip8(0xF555);
-        let (x, _) = chip8.get_regs_x_y();
 
         for i in 0..=5 {
             chip8.registers[i] = (i + 1) as u8;

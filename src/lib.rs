@@ -3,6 +3,7 @@ use thiserror::Error;
 pub mod chip8;
 pub mod graphics;
 pub mod input;
+pub mod timer;
 pub mod traits;
 
 /// Screen is 64 pixels wide
