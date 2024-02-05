@@ -2,8 +2,6 @@ use std::sync::mpsc::Receiver;
 
 use rand::Rng;
 
-use crate::graphics::GraphicsImpl;
-use crate::input::SdlInput;
 use crate::timer::TimerOperation;
 use crate::traits::{Graphics, Input};
 
@@ -30,6 +28,7 @@ pub struct Chip8<G, I> {
     graphics: G,
     input: I,
     timer_rx: Receiver<TimerOperation>,
+    draw_on_screen: bool,
 }
 
 // The default address at which the application is loaded at
@@ -48,6 +47,8 @@ const NUM_REGISTERS: usize = 16;
 const REG_SIZE: u16 = 1;
 
 const OPCODE_SIZE: u16 = 2;
+
+const FLAG_REGISTER: usize = 0xF;
 
 // Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
 // 0x1FF.
@@ -69,6 +70,21 @@ const HEX_DIGITS: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0xF0, // Letter: E
     0xF0, 0x80, 0xF0, 0x80, 0x80, // Letter: F
 ];
+
+#[derive(Debug)]
+pub struct Chip8OutputState {
+    pub sound_on: bool,
+    pub draw_on_screen: bool,
+}
+
+impl Chip8OutputState {
+    pub fn new(sound_on: bool, draw_on_screen: bool) -> Self {
+        Self {
+            sound_on,
+            draw_on_screen,
+        }
+    }
+}
 
 // Throughout the code, Vx refers to the general purpose registers. There are
 // 15 general purpose registers from V0 to VE. The 16th register is used to
@@ -99,11 +115,13 @@ where
             sp: 0,
             input,
             timer_rx,
+            draw_on_screen: false,
         }
     }
 
-    pub fn tick(&mut self) {
-        self.emulate_cycle();
+    pub fn emulate_cycle(&mut self) -> Chip8OutputState {
+        self.draw_on_screen = false;
+        self.emulate_instruction();
 
         // If there's a timer updated, update the timers
         while let Ok(timer_operation) = self.timer_rx.try_recv() {
@@ -112,14 +130,14 @@ where
                     self.sound_timer = self.sound_timer.saturating_sub(val);
                     self.delay_timer = self.delay_timer.saturating_sub(val);
                 }
-                _ => {
-                    println!("Unsupported timer operation");
-                }
             }
         }
+
+        let sound_on = self.sound_timer > 0;
+        Chip8OutputState::new(sound_on, self.draw_on_screen)
     }
 
-    fn emulate_cycle(&mut self) {
+    fn emulate_instruction(&mut self) {
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
@@ -230,6 +248,7 @@ where
             // Clear the screen
             0x00E0 => {
                 self.graphics.clear();
+                self.draw_on_screen = true;
             }
             // Return from subroutine
             0x00EE => {
@@ -392,9 +411,9 @@ where
                 let (val, overflow) = self.registers[x].overflowing_add(self.registers[y]);
 
                 if overflow {
-                    self.registers[0xF] = 1;
+                    self.registers[FLAG_REGISTER] = 1;
                 } else {
-                    self.registers[0xF] = 0;
+                    self.registers[FLAG_REGISTER] = 0;
                 }
 
                 self.registers[x] = val;
@@ -408,9 +427,9 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 if self.registers[x] > self.registers[y] {
-                    self.registers[0xF] = 1;
+                    self.registers[FLAG_REGISTER] = 1;
                 } else {
-                    self.registers[0xF] = 0;
+                    self.registers[FLAG_REGISTER] = 0;
                 }
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
@@ -425,7 +444,7 @@ where
             0x0006 => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.registers[0xF] = self.registers[x] & 0x1;
+                self.registers[FLAG_REGISTER] = self.registers[x] & 0x1;
 
                 self.registers[x] >>= 1;
                 self.pc += OPCODE_SIZE;
@@ -438,9 +457,9 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 if self.registers[y] > self.registers[x] {
-                    self.registers[0xF] = 1;
+                    self.registers[FLAG_REGISTER] = 1;
                 } else {
-                    self.registers[0xF] = 0;
+                    self.registers[FLAG_REGISTER] = 0;
                 }
 
                 let (val, _) = self.registers[y].overflowing_sub(self.registers[x]);
@@ -454,7 +473,7 @@ where
             0x000E => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.registers[0xF] = self.registers[x] & 0x1;
+                self.registers[FLAG_REGISTER] = self.registers[x] & 0x1;
                 self.registers[x] <<= 1;
                 self.pc += OPCODE_SIZE;
             }
@@ -518,11 +537,12 @@ where
         // Display n-byte sprite starting at memory location I at (Vx, Vy),
         // set VF = collision
         let flipped = self.graphics.draw(&self.opcode, &self.ir, &self.memory);
+        self.draw_on_screen = true;
 
         if flipped {
-            self.registers[0xF] = 1;
+            self.registers[FLAG_REGISTER] = 1;
         } else {
-            self.registers[0xF] = 0;
+            self.registers[FLAG_REGISTER] = 0;
         }
     }
 
@@ -696,6 +716,7 @@ mod tests {
     use crate::{graphics::GraphicsImpl, input::SdlInput};
 
     use super::Chip8;
+    use super::FLAG_REGISTER;
 
     fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl, SdlInput> {
         let graphics = GraphicsImpl::new();
@@ -727,7 +748,7 @@ mod tests {
 
                     chip8.$test_fn();
                     assert_eq!(chip8.registers[x], reg1_end);
-                    assert_eq!(chip8.registers[0xF], carry);
+                    assert_eq!(chip8.registers[FLAG_REGISTER], carry);
                     assert_eq!(chip8.pc, 0x202);
                 }
             )*
