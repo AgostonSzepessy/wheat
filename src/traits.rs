@@ -1,6 +1,6 @@
 use crate::Key;
 
-pub trait Graphics {
+pub trait GraphicsBuffer {
     /// Clears the entire screen with 0s; wipes everything from the screen.
     fn clear(&mut self);
 
@@ -13,7 +13,7 @@ pub trait Graphics {
     /// `memory`: The memory from which to read the sprite.
     fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool;
 
-    fn screen(&self) -> &Vec<u8>;
+    fn buffer(&self) -> &Vec<u8>;
 }
 
 pub trait Display {

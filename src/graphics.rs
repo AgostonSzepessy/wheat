@@ -1,4 +1,4 @@
-use crate::traits::Graphics;
+use crate::traits::GraphicsBuffer;
 use crate::{SCREEN_HEIGHT, SCREEN_SIZE, SCREEN_WIDTH, SPRITE_WIDTH};
 
 /// Graphics processor for Chip8. The emulator has a screen that is `64`x`32` pixels.
@@ -11,22 +11,22 @@ use crate::{SCREEN_HEIGHT, SCREEN_SIZE, SCREEN_WIDTH, SPRITE_WIDTH};
 /// Sprites are `XOR`ed onto the screen, and if a pixel flips from `1` to `0`, it is signalled in
 /// the `VF` register.
 #[derive(Debug)]
-pub struct GraphicsImpl {
+pub struct Graphics {
     /// Screen on which sprites are drawn
     screen: Vec<u8>,
 }
 
-impl GraphicsImpl {
+impl Graphics {
     /// Creates a new Graphics, with a screen of `64`x`32` pixels, and all pixels on the screen
     /// initialized to 0.
     pub fn new() -> Self {
-        GraphicsImpl {
+        Graphics {
             screen: vec![0; SCREEN_SIZE as usize],
         }
     }
 }
 
-impl Graphics for GraphicsImpl {
+impl GraphicsBuffer for Graphics {
     /// Clears the entire screen with 0s; wipes everything from the screen.
     fn clear(&mut self) {
         for i in 0..self.screen.len() {
@@ -76,7 +76,7 @@ impl Graphics for GraphicsImpl {
         pixel_flipped
     }
 
-    fn screen(&self) -> &Vec<u8> {
+    fn buffer(&self) -> &Vec<u8> {
         &self.screen
     }
 }
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut graphics = GraphicsImpl::new();
+        let mut graphics = Graphics::new();
         graphics.clear();
 
         for i in 0..graphics.screen.len() {

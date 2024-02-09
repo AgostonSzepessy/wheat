@@ -3,7 +3,7 @@ use std::sync::mpsc::Receiver;
 use rand::Rng;
 
 use crate::timer::TimerOperation;
-use crate::traits::{Graphics, Input};
+use crate::traits::{GraphicsBuffer, Input};
 use crate::Key;
 
 #[derive(Debug)]
@@ -94,7 +94,7 @@ impl Chip8OutputState {
 
 impl<G> Chip8<G>
 where
-    G: Graphics,
+    G: GraphicsBuffer,
 {
     pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
@@ -726,13 +726,13 @@ where
 mod tests {
     use std::sync::mpsc;
 
-    use crate::graphics::GraphicsImpl;
+    use crate::graphics::Graphics;
 
     use super::Chip8;
     use super::FLAG_REGISTER;
 
-    fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl> {
-        let graphics = GraphicsImpl::new();
+    fn create_chip8(opcode: u16) -> Chip8<Graphics> {
+        let graphics = Graphics::new();
         let (_, timer_rx) = mpsc::channel();
         let mut chip8 = Chip8::new(graphics, timer_rx);
         chip8.opcode = opcode;

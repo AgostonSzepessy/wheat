@@ -1,5 +1,9 @@
 mod drivers;
-use chip8::{input::SdlInput, timer::TimerOperation};
+use chip8::{
+    chip8::Chip8,
+    input::{InputUpdate, SdlInput},
+    timer::TimerOperation,
+};
 
 use std::{sync::mpsc, thread, time::Duration};
 
@@ -17,10 +21,12 @@ fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
 
     let sdl_context = sdl2::init()?;
-    let display = SdlDisplayDriver::new(&sdl_context);
+    let mut display = SdlDisplayDriver::new(&sdl_context);
     let audio = SdlAudioDriver::new(&sdl_context);
     let rom = RomDriver::new(&args[1]);
-    let input = SdlInput::new(&sdl_context);
+    let mut input = SdlInput::new(&sdl_context);
+
+    while let InputUpdate::Continue = input.update() {}
 
     timer_thread_handle.join().unwrap();
 

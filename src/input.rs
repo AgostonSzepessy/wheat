@@ -32,11 +32,11 @@ impl SdlInput {
     }
 
     pub fn update(&mut self) -> InputUpdate {
-        for event in self.event_pump.poll_event() {
+        if let Some(event) = self.event_pump.poll_event() {
             use sdl2::event::Event;
             match event {
                 Event::Quit { .. } => return InputUpdate::Quit,
-                _ => continue,
+                _ => (),
             }
         }
 
