@@ -35,10 +35,6 @@ pub trait Display {
 ///
 /// based off of this diagram: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
 pub trait Input {
-    /// Updates the state of the keys. `key` is the key to update, and `state`
-    /// is the new state of the `key`.
-    fn update(&mut self, key: Key, state: bool);
-
     /// Returns the state of the specified key. The hex code that the key is
     /// mapped to is used to access its state.
     fn is_pressed(&self, key: Key) -> bool;

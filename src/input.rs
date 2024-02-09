@@ -1,6 +1,6 @@
 pub(self) use crate::traits::Input;
 use crate::Key;
-use sdl2::keyboard::Keycode;
+use sdl2::{keyboard::Keycode, EventPump};
 use thiserror::Error;
 
 const NUM_KEYS: usize = 16;
@@ -16,18 +16,59 @@ const NUM_KEYS: usize = 16;
 /// | Z (0xA) | X (0x0) | C (0xB) | V (0xF) |
 ///
 /// based off of this diagram: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
-#[derive(Debug)]
 pub struct SdlInput {
-    keys: Vec<bool>,
+    input_impl: SdlInputImpl,
+    event_pump: EventPump,
 }
 
 impl SdlInput {
     /// Creates a new `Input` with all key states set to `false`.
-    pub fn new() -> Self {
+    pub fn new(sdl: &sdl2::Sdl) -> Self {
+        let event_pump = sdl.event_pump().unwrap();
         SdlInput {
-            keys: vec![false; NUM_KEYS],
+            input_impl: SdlInputImpl::new(),
+            event_pump,
         }
     }
+
+    pub fn update(&mut self) -> InputUpdate {
+        for event in self.event_pump.poll_event() {
+            use sdl2::event::Event;
+            match event {
+                Event::Quit { .. } => return InputUpdate::Quit,
+                _ => continue,
+            }
+        }
+
+        let keys_pressed: Vec<_> = self
+            .event_pump
+            .keyboard_state()
+            .pressed_scancodes()
+            .filter_map(Keycode::from_scancode)
+            .collect();
+
+        for i in 0..self.input_impl.keys.len() {
+            self.input_impl.keys[i] = false;
+        }
+
+        for k in keys_pressed {
+            if let Ok(chip8_key) = <Keycode as TryInto<Key>>::try_into(k) {
+                self.input_impl.keys[chip8_key as usize] = true;
+            }
+        }
+
+        InputUpdate::Continue
+    }
+
+    pub fn input(&self) -> &SdlInputImpl {
+        &self.input_impl
+    }
+}
+
+#[derive(Debug)]
+pub enum InputUpdate {
+    Continue,
+    Quit,
 }
 
 #[derive(Debug, Error)]
@@ -62,25 +103,19 @@ impl TryFrom<Keycode> for Key {
     }
 }
 
-impl Input for SdlInput {
-    /// Updates the state of the keys. `key` is the key to update, and `state`
-    /// is the new state of the `key`.
-    fn update(&mut self, key: Key, state: bool) {
-        self.keys[key as usize] = state;
-    }
+pub struct SdlInputImpl {
+    pub(self) keys: Vec<bool>,
+}
 
-    /// Returns the state of the specified key. The hex code that the key is
-    /// mapped to is used to access its state.
-    /// To check if `Num1` is pressed:
-    ///
-    /// ```
-    /// use chip8::traits::Input;
-    /// use chip8::input::SdlInput;
-    /// use chip8::Key;
-    ///
-    /// let input = SdlInput::new();
-    /// assert_eq!(input.is_pressed(Key::Num0), false);
-    /// ```
+impl SdlInputImpl {
+    fn new() -> Self {
+        Self {
+            keys: vec![false; NUM_KEYS],
+        }
+    }
+}
+
+impl Input for SdlInputImpl {
     fn is_pressed(&self, key: Key) -> bool {
         self.keys[key as usize]
     }
@@ -88,7 +123,7 @@ impl Input for SdlInput {
 
 #[cfg(test)]
 mod tests {
-    use super::SdlInput;
+    use super::SdlInputImpl;
     use crate::{traits::Input, Key};
     use sdl2::keyboard::Keycode;
 
@@ -98,8 +133,8 @@ mod tests {
                 #[test]
                 fn $name() {
                     let (input_key, input_val) = $value;
-                    let mut input = SdlInput::new();
-                    input.update(input_key.try_into().unwrap(), true);
+                    let mut input = SdlInputImpl::new();
+                    input.keys[<Keycode as TryInto<Key>>::try_into(input_key).unwrap() as usize] = true;
                     assert_eq!(input.is_pressed(input_val.try_into().unwrap()), true);
                 }
             )*

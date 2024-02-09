@@ -4,9 +4,10 @@ use rand::Rng;
 
 use crate::timer::TimerOperation;
 use crate::traits::{Graphics, Input};
+use crate::Key;
 
 #[derive(Debug)]
-pub struct Chip8<G, I> {
+pub struct Chip8<G> {
     /// Current opcode
     opcode: u16,
     /// The system has 4096 bytes of memory.
@@ -26,9 +27,10 @@ pub struct Chip8<G, I> {
     sp: u8,
     /// Screen that sprites get drawn on. 64x32 pixels
     graphics: G,
-    input: I,
     timer_rx: Receiver<TimerOperation>,
     draw_on_screen: bool,
+    wait_for_keypress: bool,
+    keypress_register: u8,
 }
 
 // The default address at which the application is loaded at
@@ -90,12 +92,11 @@ impl Chip8OutputState {
 // 15 general purpose registers from V0 to VE. The 16th register is used to
 // represent the carry flag.
 
-impl<G, I> Chip8<G, I>
+impl<G> Chip8<G>
 where
     G: Graphics,
-    I: Input,
 {
-    pub fn new(graphics: G, input: I, timer_rx: Receiver<TimerOperation>) -> Self {
+    pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
         for i in 0..HEX_DIGITS.len() {
@@ -113,22 +114,39 @@ where
             sound_timer: 0,
             stack: vec![0; STACK_SIZE],
             sp: 0,
-            input,
             timer_rx,
             draw_on_screen: false,
+            wait_for_keypress: false,
+            keypress_register: 0,
         }
     }
 
-    pub fn emulate_cycle(&mut self) -> Chip8OutputState {
+    pub fn emulate_cycle(&mut self, input: &impl Input) -> Chip8OutputState {
         self.draw_on_screen = false;
-        self.emulate_instruction();
+
+        if self.wait_for_keypress {
+            for i in 0..=Key::F as u8 {
+                if input.is_pressed(i.try_into().unwrap()) {
+                    self.wait_for_keypress = false;
+                    self.registers[self.keypress_register as usize] = i;
+                    break;
+                }
+            }
+        }
+
+        if !self.wait_for_keypress {
+            self.emulate_instruction(input);
+        }
 
         // If there's a timer updated, update the timers
         while let Ok(timer_operation) = self.timer_rx.try_recv() {
-            match timer_operation {
-                TimerOperation::Decrement(val) => {
-                    self.sound_timer = self.sound_timer.saturating_sub(val);
-                    self.delay_timer = self.delay_timer.saturating_sub(val);
+            // Only update timers when we're not waiting on a keypress
+            if !self.wait_for_keypress {
+                match timer_operation {
+                    TimerOperation::Decrement(val) => {
+                        self.sound_timer = self.sound_timer.saturating_sub(val);
+                        self.delay_timer = self.delay_timer.saturating_sub(val);
+                    }
                 }
             }
         }
@@ -137,7 +155,7 @@ where
         Chip8OutputState::new(sound_on, self.draw_on_screen)
     }
 
-    fn emulate_instruction(&mut self) {
+    fn emulate_instruction(&mut self, input: &impl Input) {
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
@@ -216,7 +234,7 @@ where
             }
 
             0xE000 => {
-                self.opcode_0xeyyy();
+                self.opcode_0xeyyy(input);
             }
 
             0xF000 => {
@@ -548,7 +566,7 @@ where
 
     /// Takes care of opcodes that are related to input such as checking whether
     /// a key is pressed or not pressed, and waiting until a key is pressed.
-    fn opcode_0xeyyy(&mut self) {
+    fn opcode_0xeyyy(&mut self, input: &impl Input) {
         match self.opcode & 0xFF {
             // Ex9E - SKP Vx
             // Skips the next instruction if the key with the value of Vx is
@@ -557,7 +575,7 @@ where
             0x9E => {
                 let (x, _) = self.get_regs_x_y();
 
-                if self.input.is_pressed((x as u8).try_into().unwrap()) {
+                if input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += OPCODE_SIZE;
                 }
 
@@ -571,7 +589,7 @@ where
             0xA1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !self.input.is_pressed((x as u8).try_into().unwrap()) {
+                if !input.is_pressed((x as u8).try_into().unwrap()) {
                     self.pc += OPCODE_SIZE;
                 }
 
@@ -602,15 +620,10 @@ where
             0x0A => {
                 let (x, _) = self.get_regs_x_y();
 
-                // Loop from 0 to 15 (use 0x10 because `..` is exclusive for the upper
-                // range
-                for i in 0x0..=0xF {
-                    if self.input.is_pressed((i as u8).try_into().unwrap()) {
-                        self.registers[x] = i;
-                        self.pc += OPCODE_SIZE;
-                        break;
-                    }
-                }
+                self.wait_for_keypress = true;
+                self.keypress_register = x as u8;
+
+                self.pc += OPCODE_SIZE;
             }
 
             // Fx15 - LD DT, Vx
@@ -713,16 +726,15 @@ where
 mod tests {
     use std::sync::mpsc;
 
-    use crate::{graphics::GraphicsImpl, input::SdlInput};
+    use crate::graphics::GraphicsImpl;
 
     use super::Chip8;
     use super::FLAG_REGISTER;
 
-    fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl, SdlInput> {
+    fn create_chip8(opcode: u16) -> Chip8<GraphicsImpl> {
         let graphics = GraphicsImpl::new();
-        let input = SdlInput::new();
         let (_, timer_rx) = mpsc::channel();
-        let mut chip8 = Chip8::new(graphics, input, timer_rx);
+        let mut chip8 = Chip8::new(graphics, timer_rx);
         chip8.opcode = opcode;
         chip8
     }
