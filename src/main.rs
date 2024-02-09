@@ -6,6 +6,7 @@ use chip8::{
     timer::TimerOperation,
     traits::Display,
 };
+use measurements::Frequency;
 
 use std::{sync::mpsc, thread, time::Duration};
 
@@ -33,6 +34,10 @@ fn main() -> Result<(), String> {
     let graphics = Graphics::new();
     let mut chip8 = Chip8::new(graphics, timer_rx);
 
+    // Start with 500Hz, make this adjustable later
+    let chip8_freq = Frequency::from_hertz(500.into());
+    let sleep_time = chip8_freq.as_period();
+
     match chip8.load_rom(&rom) {
         Ok(_) => (),
         Err(e) => println!("{}", e),
@@ -48,6 +53,8 @@ fn main() -> Result<(), String> {
         } else {
             audio.stop_buzzer();
         }
+
+        thread::sleep(sleep_time);
     }
 
     timer_thread_handle.join().unwrap();
