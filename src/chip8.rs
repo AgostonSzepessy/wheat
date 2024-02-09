@@ -3,8 +3,8 @@ use std::sync::mpsc::Receiver;
 use rand::Rng;
 
 use crate::timer::TimerOperation;
-use crate::traits::{GraphicsBuffer, Input};
-use crate::Key;
+use crate::traits::{GraphicsBuffer, Input, Rom};
+use crate::{Chip8Error, Key};
 
 #[derive(Debug)]
 pub struct Chip8<G> {
@@ -120,6 +120,19 @@ where
             wait_for_keypress: false,
             keypress_register: 0,
         }
+    }
+
+    pub fn load_rom(&mut self, rom: &impl Rom) -> Result<(), Chip8Error> {
+        for (i, rom_data) in rom.data().iter().enumerate() {
+            let addr = APP_LOCATION as usize + i;
+            if i < MEMORY_SIZE {
+                self.memory[addr] = *rom_data;
+            } else {
+                return Err(Chip8Error::RomTooBig(addr as u16));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn emulate_cycle(&mut self, input: &impl Input) -> Chip8OutputState {

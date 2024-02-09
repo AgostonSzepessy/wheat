@@ -38,13 +38,15 @@ pub enum Key {
 }
 
 #[derive(Error, Debug)]
-pub enum KeyError {
+pub enum Chip8Error {
     #[error("Internal error from unsupported key code: `{0}`")]
     InternalError(u8),
+    #[error("Rom could not be loaded fully into memory; stopping at `{0:#x}`")]
+    RomTooBig(u16),
 }
 
 impl TryFrom<u8> for Key {
-    type Error = KeyError;
+    type Error = Chip8Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -64,7 +66,7 @@ impl TryFrom<u8> for Key {
             0xD => Ok(Key::D),
             0xE => Ok(Key::E),
             0xF => Ok(Key::F),
-            e => Err(KeyError::InternalError(e)),
+            e => Err(Chip8Error::InternalError(e)),
         }
     }
 }

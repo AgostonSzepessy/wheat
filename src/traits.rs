@@ -39,3 +39,7 @@ pub trait Input {
     /// mapped to is used to access its state.
     fn is_pressed(&self, key: Key) -> bool;
 }
+
+pub trait Rom {
+    fn data(&self) -> &Vec<u8>;
+}
