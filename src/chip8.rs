@@ -73,17 +73,18 @@ const HEX_DIGITS: [u8; 80] = [
     0xF0, 0x80, 0xF0, 0x80, 0x80, // Letter: F
 ];
 
-#[derive(Debug)]
-pub struct Chip8OutputState {
+pub struct Chip8OutputState<'a> {
     pub sound_on: bool,
     pub draw_on_screen: bool,
+    pub graphics: &'a dyn GraphicsBuffer,
 }
 
-impl Chip8OutputState {
-    pub fn new(sound_on: bool, draw_on_screen: bool) -> Self {
+impl<'a> Chip8OutputState<'a> {
+    pub fn new(sound_on: bool, draw_on_screen: bool, graphics_buffer: &'a dyn GraphicsBuffer) -> Self {
         Self {
             sound_on,
             draw_on_screen,
+            graphics: graphics_buffer,
         }
     }
 }
@@ -152,7 +153,7 @@ where
         }
 
         let sound_on = self.sound_timer > 0;
-        Chip8OutputState::new(sound_on, self.draw_on_screen)
+        Chip8OutputState::new(sound_on, self.draw_on_screen, &self.graphics)
     }
 
     fn emulate_instruction(&mut self, input: &impl Input) {
