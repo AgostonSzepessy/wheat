@@ -173,6 +173,8 @@ where
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
+        println!("opcode is {:#x}", self.opcode);
+
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
             0x0000 => {
@@ -390,7 +392,7 @@ where
         let val = (self.opcode & 0x00FF) as u8;
         let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
-        self.registers[x] += val;
+        self.registers[x] = self.registers[x].wrapping_add(val);
         self.pc += OPCODE_SIZE;
     }
 
@@ -576,6 +578,8 @@ where
         } else {
             self.registers[FLAG_REGISTER] = 0;
         }
+
+        self.pc += OPCODE_SIZE;
     }
 
     /// Takes care of opcodes that are related to input such as checking whether

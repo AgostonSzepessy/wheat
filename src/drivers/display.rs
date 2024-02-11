@@ -34,13 +34,13 @@ impl SdlDisplayDriver {
 }
 
 impl Display for SdlDisplayDriver {
-    fn draw(&mut self, buffer: &Vec<u8>) {
+    fn draw(&mut self, buffer: &Vec<Vec<u8>>) {
         for row in 0..SCREEN_HEIGHT {
             for col in 0..SCREEN_WIDTH {
-                let x = row * SCALE_FACTOR;
-                let y = col * SCALE_FACTOR;
+                let x = col * SCALE_FACTOR;
+                let y = row * SCALE_FACTOR;
 
-                let val = buffer[(row * SCREEN_WIDTH + col) as usize];
+                let val = buffer[row as usize][col as usize];
                 let color = pixels::Color::RGB(val * 255, val * 255, val * 255);
 
                 self.canvas.set_draw_color(color);
@@ -51,8 +51,7 @@ impl Display for SdlDisplayDriver {
                     SCALE_FACTOR as u32,
                 ));
             }
-
-            self.canvas.present();
         }
+        self.canvas.present();
     }
 }

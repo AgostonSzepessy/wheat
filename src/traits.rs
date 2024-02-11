@@ -13,14 +13,14 @@ pub trait GraphicsBuffer {
     /// `memory`: The memory from which to read the sprite.
     fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool;
 
-    fn buffer(&self) -> &Vec<u8>;
+    fn buffer(&self) -> &Vec<Vec<u8>>;
 }
 
 pub trait Display {
     /// Draws the specified `buffer`. The buffer is expected to be
     /// made up of `1`s and `0`s. `1`s are drawn as white and `0`s
     /// are drawn as black.
-    fn draw(&mut self, buffer: &Vec<u8>);
+    fn draw(&mut self, buffer: &Vec<Vec<u8>>);
 }
 
 /// Keeps track of the state of the keys. Chip8 uses 16 keys; this implementation
