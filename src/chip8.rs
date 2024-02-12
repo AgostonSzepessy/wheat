@@ -508,7 +508,7 @@ where
             0x000E => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.registers[FLAG_REGISTER] = self.registers[x] & 0x1;
+                self.registers[FLAG_REGISTER] = (self.registers[x] >> 7) & 0x1;
                 self.registers[x] <<= 1;
                 self.pc += OPCODE_SIZE;
             }
@@ -1004,8 +1004,9 @@ mod tests {
         test_subn_2_1: (opcode_0x8yyy, (0x8AB7, 2, 1, 255, 0)),
 
         test_shl_0: (opcode_0x8yyy, (0x8ABE, 0, 0, 0, 0)),
-        test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 1)),
+        test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 0)),
         test_shl_2: (opcode_0x8yyy, (0x8ABE, 2, 0, 4, 0)),
-        test_shl_3: (opcode_0x8yyy, (0x8ABE, 3, 0, 6, 1)),
+        test_shl_3: (opcode_0x8yyy, (0x8ABE, 128, 0, 0, 1)),
+        test_shl_4: (opcode_0x8yyy, (0x8ABE, 129, 0, 2, 1)),
     }
 }
