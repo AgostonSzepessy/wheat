@@ -288,9 +288,9 @@ where
             0x00EE => {
                 // Restore program counter to previous location on stack
                 // before subroutine was called
+                self.sp -= 1;
                 self.pc = self.stack[self.sp as usize];
                 // Restore stack
-                self.sp -= 1;
             }
 
             // No other opcodes start with 0x0

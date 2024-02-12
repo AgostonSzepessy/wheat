@@ -58,8 +58,8 @@ impl GraphicsBuffer for Graphics {
     fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool {
         // x and y position, and height of the sprite, with the origin at the
         // top left corner
-        let x = ((*opcode & 0x0F00) >> 8) % SCREEN_WIDTH;
-        let y = ((*opcode & 0x00F0) >> 4) % SCREEN_HEIGHT;
+        let x = ((*opcode & 0x0F00) >> 8);
+        let y = ((*opcode & 0x00F0) >> 4);
         let num_rows = *opcode & 0x000F;
 
         // Assume no collisions happen
@@ -68,14 +68,14 @@ impl GraphicsBuffer for Graphics {
         // Width of each pixel is 8 bits, and height is determined by the last nibble in opcode
         for row in 0..num_rows {
             let sprite = memory[(*ir + row) as usize];
-            println!("{:#010b}", sprite);
+            println!("{:#x}, {:#010b}", sprite, sprite);
             for bit in 0..SPRITE_WIDTH {
                 // Keep only the smallest bit, because that's what we care about
                 let pixel = (sprite >> (7 - bit)) & 0x1;
 
                 // Allow wrap-around by modulusing the result
-                let pos_y = (y + row) as usize;
-                let pos_x = (x + bit) as usize;
+                let pos_y = ((y + row) % SCREEN_HEIGHT) as usize;
+                let pos_x = ((x + bit) % SCREEN_WIDTH) as usize;
 
                 if pixel == PIXEL_ON && self.screen[pos_y][pos_x] == PIXEL_ON {
                     self.screen[pos_y][pos_x] ^= pixel;
@@ -86,7 +86,7 @@ impl GraphicsBuffer for Graphics {
             }
         }
 
-        self.dump();
+        // self.dump();
 
         pixel_flipped
     }
