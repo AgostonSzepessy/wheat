@@ -1,3 +1,4 @@
+use core::num;
 use std::sync::mpsc::Receiver;
 
 use rand::Rng;
@@ -570,7 +571,13 @@ where
         // Dxyn - DRW Vx, Vy, nibble
         // Display n-byte sprite starting at memory location I at (Vx, Vy),
         // set VF = collision
-        let flipped = self.graphics.draw(&self.opcode, &self.ir, &self.memory);
+        let (x_reg, y_reg) = self.get_regs_x_y();
+        let num_rows = (self.opcode & 0x000F) as u8;
+
+        let x = self.registers[x_reg];
+        let y = self.registers[y_reg];
+
+        let flipped = self.graphics.draw(x, y, num_rows, &self.ir, &self.memory);
         self.draw_on_screen = true;
 
         if flipped {

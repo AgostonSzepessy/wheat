@@ -6,12 +6,12 @@ pub trait GraphicsBuffer {
 
     /// Draws a sprite on the screen, and returns `true` if a pixel on the screen was flipped from
     /// 1 to 0.
-    /// `opcode`: Determines position and height of sprite, with position being top left
-    /// corner of the sprite.
+    /// `x`: top-left "x" coordinate on screen where to draw
+    /// `y`: top-left "y" coordinate on screen where to draw
     /// `ir`: The index register, which contains the area of memory to
     /// start reading the sprite from.
     /// `memory`: The memory from which to read the sprite.
-    fn draw(&mut self, opcode: &u16, ir: &u16, memory: &Vec<u8>) -> bool;
+    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: &u16, memory: &Vec<u8>) -> bool;
 
     fn buffer(&self) -> &Vec<Vec<u8>>;
 }

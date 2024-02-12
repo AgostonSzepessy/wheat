@@ -12,7 +12,7 @@ pub const SCREEN_WIDTH: u16 = 64;
 pub const SCREEN_HEIGHT: u16 = 32;
 pub const SCREEN_SIZE: u16 = SCREEN_WIDTH * SCREEN_HEIGHT;
 /// All sprites are 8 pixels wide
-pub const SPRITE_WIDTH: u16 = 8;
+pub const SPRITE_WIDTH: u8 = 8;
 
 /// The keymap that this implementation uses internally. Based off
 /// of: <http://devernay.free.fr/hacks/chip8/C8TECH10.HTM#keyboard>
