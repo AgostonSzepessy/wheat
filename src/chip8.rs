@@ -445,13 +445,11 @@ where
                 let (x, y) = self.get_regs_x_y();
                 let (val, overflow) = self.registers[x].overflowing_add(self.registers[y]);
 
-                if overflow {
-                    self.registers[FLAG_REGISTER] = 1;
-                } else {
-                    self.registers[FLAG_REGISTER] = 0;
-                }
+                let flag = if overflow { 1 } else { 0 };
 
                 self.registers[x] = val;
+                self.registers[FLAG_REGISTER] = flag;
+
                 self.pc += OPCODE_SIZE;
             }
 
@@ -461,14 +459,17 @@ where
             0x0005 => {
                 let (x, y) = self.get_regs_x_y();
 
-                if self.registers[x] > self.registers[y] {
-                    self.registers[FLAG_REGISTER] = 1;
+                let flag = if self.registers[x] > self.registers[y] {
+                    1
                 } else {
-                    self.registers[FLAG_REGISTER] = 0;
-                }
+                    0
+                };
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
+
                 self.registers[x] = val;
+                self.registers[FLAG_REGISTER] = flag;
+
                 self.pc += OPCODE_SIZE;
             }
 
@@ -479,9 +480,10 @@ where
             0x0006 => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.registers[FLAG_REGISTER] = self.registers[x] & 0x1;
-
+                let flag = self.registers[x] & 0x1;
                 self.registers[x] >>= 1;
+
+                self.registers[FLAG_REGISTER] = flag;
                 self.pc += OPCODE_SIZE;
             }
 
@@ -491,14 +493,17 @@ where
             0x0007 => {
                 let (x, y) = self.get_regs_x_y();
 
-                if self.registers[y] > self.registers[x] {
-                    self.registers[FLAG_REGISTER] = 1;
+                let flag = if self.registers[y] > self.registers[x] {
+                    1
                 } else {
-                    self.registers[FLAG_REGISTER] = 0;
-                }
+                    0
+                };
 
                 let (val, _) = self.registers[y].overflowing_sub(self.registers[x]);
+
                 self.registers[x] = val;
+                self.registers[FLAG_REGISTER] = flag;
+
                 self.pc += OPCODE_SIZE;
             }
 
@@ -508,8 +513,11 @@ where
             0x000E => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.registers[FLAG_REGISTER] = (self.registers[x] >> 7) & 0x1;
+                let flag = (self.registers[x] >> 7) & 0x1;
+
                 self.registers[x] <<= 1;
+                self.registers[FLAG_REGISTER] = flag;
+
                 self.pc += OPCODE_SIZE;
             }
 
