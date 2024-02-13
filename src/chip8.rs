@@ -174,7 +174,7 @@ where
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
-        // println!("opcode is {:#x}", self.opcode);
+        println!("opcode is {:#x}", self.opcode);
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
@@ -284,6 +284,7 @@ where
             0x00E0 => {
                 self.graphics.clear();
                 self.draw_on_screen = true;
+                self.pc += OPCODE_SIZE;
             }
             // Return from subroutine
             0x00EE => {
@@ -291,7 +292,6 @@ where
                 // before subroutine was called
                 self.sp -= 1;
                 self.pc = self.stack[self.sp as usize];
-                // Restore stack
             }
 
             // No other opcodes start with 0x0
@@ -577,7 +577,7 @@ where
         let x = self.registers[x_reg];
         let y = self.registers[y_reg];
 
-        let flipped = self.graphics.draw(x, y, num_rows, &self.ir, &self.memory);
+        let flipped = self.graphics.draw(x, y, num_rows, self.ir, &self.memory);
         self.draw_on_screen = true;
 
         if flipped {
@@ -752,6 +752,7 @@ mod tests {
     use std::sync::mpsc;
 
     use crate::graphics::Graphics;
+    use crate::traits::GraphicsBuffer;
 
     use super::Chip8;
     use super::FLAG_REGISTER;
@@ -789,6 +790,25 @@ mod tests {
                     assert_eq!(chip8.pc, 0x202);
                 }
             )*
+        }
+    }
+
+    #[test]
+    fn test_0x00e0() {
+        let mut chip8 = create_chip8(0x00e0);
+        // Draw the first sprite digit - digits are loaded starting at 0x0 and are all 5 bytes tall
+        chip8.graphics.draw(0, 0, 5, 0, &chip8.memory);
+
+        chip8.opcode_0x0yyy();
+
+        assert_eq!(chip8.pc, 0x202);
+
+        let screen = chip8.graphics.buffer();
+
+        for i in screen {
+            for j in i {
+                assert_eq!(*j, 0);
+            }
         }
     }
 

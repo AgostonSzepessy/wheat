@@ -55,13 +55,13 @@ impl GraphicsBuffer for Graphics {
     /// `ir`: The index register, which contains the area of memory to
     /// start reading the sprite from.
     /// `memory`: The memory from which to read the sprite.
-    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: &u16, memory: &Vec<u8>) -> bool {
+    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: u16, memory: &Vec<u8>) -> bool {
         // Assume no collisions happen
         let mut pixel_flipped = false;
 
         // Width of each pixel is 8 bits, and height is determined by the last nibble in opcode
         for row in 0..num_rows {
-            let sprite = memory[(*ir + row as u16) as usize];
+            let sprite = memory[(ir + row as u16) as usize];
             // println!("{:#x}, {:#010b}", sprite, sprite);
             for bit in 0..SPRITE_WIDTH {
                 // Keep only the smallest bit, because that's what we care about
