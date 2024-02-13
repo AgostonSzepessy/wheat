@@ -459,13 +459,20 @@ where
             0x0005 => {
                 let (x, y) = self.get_regs_x_y();
 
-                let flag = if self.registers[x] > self.registers[y] {
+                println!("x: {:#x}, y: {:#x}", x, y);
+                println!(
+                    "self.registers[x]: {:#x}, self.registers[y]: {:#x}",
+                    self.registers[x], self.registers[y]
+                );
+
+                let flag = if self.registers[x] >= self.registers[y] {
                     1
                 } else {
                     0
                 };
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
+                println!("val is {:#x}", val);
 
                 self.registers[x] = val;
                 self.registers[FLAG_REGISTER] = flag;
@@ -493,7 +500,7 @@ where
             0x0007 => {
                 let (x, y) = self.get_regs_x_y();
 
-                let flag = if self.registers[y] > self.registers[x] {
+                let flag = if self.registers[y] >= self.registers[x] {
                     1
                 } else {
                     0
@@ -1018,18 +1025,22 @@ mod tests {
         test_add_1_1: (opcode_0x8yyy, (0x8AB4, 1, 1, 2, 0)),
         test_add_254_3: (opcode_0x8yyy, (0x8AB4, 254, 3, 1, 1)),
 
-        test_sub_1_1: (opcode_0x8yyy, (0x8AB5, 1, 1, 0, 0)),
+        test_sub_1_1: (opcode_0x8yyy, (0x8AB5, 1, 1, 0, 1)),
         test_sub_2_1: (opcode_0x8yyy, (0x8AB5, 2, 1, 1, 1)),
         test_sub_2_3: (opcode_0x8yyy, (0x8AB5, 2, 3, 255, 0)),
+        test_sub_v3_vf_1: (opcode_0x8yyy, (0x83F5, 5, 5, 0, 1)),
+        test_sub_v3_vf_2: (opcode_0x8yyy, (0x83F5, 5, 6, 255, 0)),
+        test_sub_v3_vf_3: (opcode_0x8yyy, (0x83F5, 5, 4, 1, 1)),
 
         test_shr_0: (opcode_0x8yyy, (0x8AB6, 0, 0, 0, 0)),
         test_shr_1: (opcode_0x8yyy, (0x8AB6, 1, 0, 0, 1)),
         test_shr_2: (opcode_0x8yyy, (0x8AB6, 2, 0, 1, 0)),
         test_shr_3: (opcode_0x8yyy, (0x8AB6, 3, 0, 1, 1)),
 
-        test_subn_1_1: (opcode_0x8yyy, (0x8AB7, 1, 1, 0, 0)),
+        test_subn_1_1: (opcode_0x8yyy, (0x8AB7, 1, 1, 0, 1)),
         test_subn_1_2: (opcode_0x8yyy, (0x8AB7, 1, 2, 1, 1)),
         test_subn_2_1: (opcode_0x8yyy, (0x8AB7, 2, 1, 255, 0)),
+        test_subn_v3_vf: (opcode_0x8yyy, (0x83F7, 5, 4, 255, 0)),
 
         test_shl_0: (opcode_0x8yyy, (0x8ABE, 0, 0, 0, 0)),
         test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 0)),
