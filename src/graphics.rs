@@ -62,7 +62,7 @@ impl GraphicsBuffer for Graphics {
         // Width of each pixel is 8 bits, and height is determined by the last nibble in opcode
         for row in 0..num_rows {
             let sprite = memory[(*ir + row as u16) as usize];
-            println!("{:#x}, {:#010b}", sprite, sprite);
+            // println!("{:#x}, {:#010b}", sprite, sprite);
             for bit in 0..SPRITE_WIDTH {
                 // Keep only the smallest bit, because that's what we care about
                 let pixel = (sprite >> (7 - bit)) & 0x1;

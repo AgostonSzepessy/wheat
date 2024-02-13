@@ -54,6 +54,7 @@ impl SdlInput {
         for k in keys_pressed {
             if let Ok(chip8_key) = <Keycode as TryInto<Key>>::try_into(k) {
                 self.input_impl.keys[chip8_key as usize] = true;
+                println!("{:?} was pressed", chip8_key);
             }
         }
 

@@ -174,7 +174,7 @@ where
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
-        println!("opcode is {:#x}", self.opcode);
+        // println!("opcode is {:#x}", self.opcode);
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
@@ -600,7 +600,7 @@ where
             0x9E => {
                 let (x, _) = self.get_regs_x_y();
 
-                if input.is_pressed((x as u8).try_into().unwrap()) {
+                if input.is_pressed((self.registers[x]).try_into().unwrap()) {
                     self.pc += OPCODE_SIZE;
                 }
 
@@ -614,7 +614,7 @@ where
             0xA1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !input.is_pressed((x as u8).try_into().unwrap()) {
+                if !input.is_pressed((self.registers[x]).try_into().unwrap()) {
                     self.pc += OPCODE_SIZE;
                 }
 
@@ -687,7 +687,7 @@ where
                 // Each hex sprite takes up 5 bytes, and they start at address
                 // 0x0, so multiplying the value in Vx by 5 will get us the
                 // address of the sprite
-                self.ir = x as u16 * 5;
+                self.ir = self.registers[x] as u16 * 5;
                 self.pc += OPCODE_SIZE;
             }
 
