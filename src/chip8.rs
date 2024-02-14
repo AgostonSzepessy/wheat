@@ -987,7 +987,7 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let (opcode, reg1_start_val, reg2_start_val, ending_sp) = $values;
+                    let (opcode, reg1_start_val, reg2_start_val, ending_pc) = $values;
                     let mut chip8 = create_chip8(opcode);
                     let (x, y) = chip8.get_regs_x_y();
 
@@ -995,13 +995,17 @@ mod tests {
                     chip8.registers[y] = reg2_start_val;
 
                     chip8.$test_fn();
-                    assert_eq!(chip8.pc, ending_sp);
+                    assert_eq!(chip8.pc, ending_pc);
                 }
             )*
         }
     }
 
     test_skip_register_opcodes! {
+        test_0x3xyy_eq: (opcode_0x3yyy, (0x3110, 0x10, 0x10, 0x204)),
+        test_0x3xyy_neq: (opcode_0x3yyy, (0x3120, 0x10, 0x10, 0x202)),
+        test_0x4xyy_eq: (opcode_0x4yyy, (0x3110, 0x10, 0x10, 0x202)),
+        test_0x4xyy_neq: (opcode_0x4yyy, (0x3120, 0x10, 0x10, 0x204)),
         test_0x5yyy_eq: (opcode_0x5yyy, (0x5120, 0x10, 0x10, 0x204)),
         test_0x5yyy_neq: (opcode_0x5yyy, (0x5120, 0x11, 0x10, 0x202)),
         test_0x9yyy_eq: (opcode_0x9yyy, (0x5120, 0x10, 0x10, 0x202)),
