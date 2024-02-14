@@ -1,3 +1,5 @@
+use std::sync::mpsc::Receiver;
+
 pub(self) use crate::traits::Input;
 use crate::Key;
 use sdl2::{keyboard::Keycode, EventPump};
@@ -19,15 +21,17 @@ const NUM_KEYS: usize = 16;
 pub struct SdlInput {
     input_impl: SdlInputImpl,
     event_pump: EventPump,
+    rx: Receiver<()>,
 }
 
 impl SdlInput {
     /// Creates a new `Input` with all key states set to `false`.
-    pub fn new(sdl: &sdl2::Sdl) -> Self {
+    pub fn new(sdl: &sdl2::Sdl, rx: Receiver<()>) -> Self {
         let event_pump = sdl.event_pump().unwrap();
         SdlInput {
             input_impl: SdlInputImpl::new(),
             event_pump,
+            rx,
         }
     }
 
@@ -40,21 +44,24 @@ impl SdlInput {
             }
         }
 
-        let keys_pressed: Vec<_> = self
-            .event_pump
-            .keyboard_state()
-            .pressed_scancodes()
-            .filter_map(Keycode::from_scancode)
-            .collect();
+        // Don't update input every frame; otherwise input is very janky
+        while let Ok(()) = self.rx.try_recv() {
+            let keys_pressed: Vec<_> = self
+                .event_pump
+                .keyboard_state()
+                .pressed_scancodes()
+                .filter_map(Keycode::from_scancode)
+                .collect();
 
-        for i in 0..self.input_impl.keys.len() {
-            self.input_impl.keys[i] = false;
-        }
+            for i in 0..self.input_impl.keys.len() {
+                self.input_impl.keys[i] = false;
+            }
 
-        for k in keys_pressed {
-            if let Ok(chip8_key) = <Keycode as TryInto<Key>>::try_into(k) {
-                self.input_impl.keys[chip8_key as usize] = true;
-                println!("{:?} was pressed", chip8_key);
+            for k in keys_pressed {
+                if let Ok(chip8_key) = <Keycode as TryInto<Key>>::try_into(k) {
+                    self.input_impl.keys[chip8_key as usize] = true;
+                    println!("{:?} was pressed", chip8_key);
+                }
             }
         }
 

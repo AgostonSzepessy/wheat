@@ -8,16 +8,22 @@ use chip8::{
 };
 use measurements::Frequency;
 
-use std::{sync::mpsc, thread, time::Duration};
+use std::{process, sync::mpsc, thread, time::Duration};
 
 use drivers::{RomDriver, SdlAudioDriver, SdlDisplayDriver};
 
 fn main() -> Result<(), String> {
     let (timer_tx, timer_rx) = mpsc::channel();
+    let (input_tx, input_rx) = mpsc::channel();
 
-    let timer_thread_handle = thread::spawn(move || {
+    thread::spawn(move || loop {
         thread::sleep(Duration::from_millis(17));
         timer_tx.send(TimerOperation::Decrement(1)).unwrap();
+    });
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(12));
+        input_tx.send(()).unwrap();
     });
 
     // TODO: replace with clap later
@@ -30,7 +36,7 @@ fn main() -> Result<(), String> {
     let mut display = SdlDisplayDriver::new(&sdl_context);
     let audio = SdlAudioDriver::new(&sdl_context);
     let rom = RomDriver::new(&args[1]);
-    let mut input = SdlInput::new(&sdl_context);
+    let mut input = SdlInput::new(&sdl_context, input_rx);
     let graphics = Graphics::new();
     let mut chip8 = Chip8::new(graphics, timer_rx);
 
@@ -57,7 +63,5 @@ fn main() -> Result<(), String> {
         thread::sleep(sleep_time);
     }
 
-    timer_thread_handle.join().unwrap();
-
-    Ok(())
+    process::exit(0);
 }

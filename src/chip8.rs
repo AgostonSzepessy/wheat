@@ -459,12 +459,6 @@ where
             0x0005 => {
                 let (x, y) = self.get_regs_x_y();
 
-                println!("x: {:#x}, y: {:#x}", x, y);
-                println!(
-                    "self.registers[x]: {:#x}, self.registers[y]: {:#x}",
-                    self.registers[x], self.registers[y]
-                );
-
                 let flag = if self.registers[x] >= self.registers[y] {
                     1
                 } else {
@@ -472,7 +466,6 @@ where
                 };
 
                 let (val, _) = self.registers[x].overflowing_sub(self.registers[y]);
-                println!("val is {:#x}", val);
 
                 self.registers[x] = val;
                 self.registers[FLAG_REGISTER] = flag;
