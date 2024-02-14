@@ -30,8 +30,8 @@ pub struct Chip8<G> {
     graphics: G,
     timer_rx: Receiver<TimerOperation>,
     draw_on_screen: bool,
-    wait_for_keypress: bool,
-    keypress_register: u8,
+    wait_for_keypress_register: u8,
+    wait_for_key_state: WaitForKeyState,
 }
 
 // The default address at which the application is loaded at
@@ -52,6 +52,14 @@ const REG_SIZE: u16 = 1;
 const OPCODE_SIZE: u16 = 2;
 
 const FLAG_REGISTER: usize = 0xF;
+
+#[derive(PartialEq, Debug)]
+enum WaitForKeyState {
+    None,
+    WaitForNoKeyPressed,
+    CheckForKeyPressed,
+    WaitForKeyRelease,
+}
 
 // Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
 // 0x1FF.
@@ -118,8 +126,8 @@ where
             sp: 0,
             timer_rx,
             draw_on_screen: false,
-            wait_for_keypress: false,
-            keypress_register: 0,
+            wait_for_keypress_register: 0,
+            wait_for_key_state: WaitForKeyState::None,
         }
     }
 
@@ -139,29 +147,16 @@ where
     pub fn emulate_cycle(&mut self, input: &impl Input) -> Chip8OutputState {
         self.draw_on_screen = false;
 
-        if self.wait_for_keypress {
-            for i in 0..=Key::F as u8 {
-                if input.is_pressed(i.try_into().unwrap()) {
-                    self.wait_for_keypress = false;
-                    self.registers[self.keypress_register as usize] = i;
-                    break;
-                }
-            }
-        }
+        self.check_and_process_0xfx0a(input);
 
-        if !self.wait_for_keypress {
-            self.emulate_instruction(input);
-        }
+        self.emulate_instruction(input);
 
-        // If there's a timer updated, update the timers
+        // If there's a timer message, update the timers
         while let Ok(timer_operation) = self.timer_rx.try_recv() {
-            // Only update timers when we're not waiting on a keypress
-            if !self.wait_for_keypress {
-                match timer_operation {
-                    TimerOperation::Decrement(val) => {
-                        self.sound_timer = self.sound_timer.saturating_sub(val);
-                        self.delay_timer = self.delay_timer.saturating_sub(val);
-                    }
+            match timer_operation {
+                TimerOperation::Decrement(val) => {
+                    self.sound_timer = self.sound_timer.saturating_sub(val);
+                    self.delay_timer = self.delay_timer.saturating_sub(val);
                 }
             }
         }
@@ -174,7 +169,9 @@ where
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
-        println!("opcode is {:#x}", self.opcode);
+        if self.opcode != 0xf00a {
+            println!("opcode is {:#x}", self.opcode);
+        }
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
@@ -643,6 +640,8 @@ where
             0x07 => {
                 let (x, _) = self.get_regs_x_y();
                 self.registers[x] = self.delay_timer;
+                println!("self.registers[x] = delay timer");
+                println!("self.registers[{:#x}] = {}", x, self.delay_timer);
                 self.pc += OPCODE_SIZE;
             }
 
@@ -653,8 +652,10 @@ where
             0x0A => {
                 let (x, _) = self.get_regs_x_y();
 
-                self.wait_for_keypress = true;
-                self.keypress_register = x as u8;
+                if self.wait_for_key_state == WaitForKeyState::None {
+                    self.wait_for_keypress_register = x as u8;
+                    self.wait_for_key_state = WaitForKeyState::WaitForNoKeyPressed;
+                }
 
                 self.pc += OPCODE_SIZE;
             }
@@ -665,6 +666,8 @@ where
             0x15 => {
                 let (x, _) = self.get_regs_x_y();
                 self.delay_timer = self.registers[x];
+                println!("delay timer = self.registers[x]");
+                println!("delay timer = {} (register[{:#}]", self.registers[x], x);
                 self.pc += OPCODE_SIZE;
             }
 
@@ -750,6 +753,55 @@ where
 
             _ => {
                 self.unknown_opcode();
+            }
+        }
+    }
+
+    // 0xFX0A requires special handling. It has to wait for the key
+    // to be released before registering the key pressed. It also
+    // needs to halt the whole emulator, except for timers.
+    // Timers need to continue to decrement.
+    fn check_and_process_0xfx0a(&mut self, input: &impl Input) {
+        if self.wait_for_key_state != WaitForKeyState::None {
+            match self.wait_for_key_state {
+                WaitForKeyState::WaitForNoKeyPressed => {
+                    let mut key_pressed = false;
+                    for i in 0..=Key::F as u8 {
+                        if input.is_pressed(i.try_into().unwrap()) {
+                            key_pressed = true;
+                        }
+                    }
+                    if !key_pressed {
+                        self.wait_for_key_state = WaitForKeyState::CheckForKeyPressed;
+                        self.pc -= OPCODE_SIZE;
+                    }
+                }
+                WaitForKeyState::CheckForKeyPressed => {
+                    for i in 0..=Key::F as u8 {
+                        if input.is_pressed(i.try_into().unwrap()) {
+                            self.registers[self.wait_for_keypress_register as usize] = i;
+                            self.wait_for_key_state = WaitForKeyState::WaitForKeyRelease;
+                            break;
+                        }
+                    }
+                    self.pc -= OPCODE_SIZE;
+                }
+                WaitForKeyState::WaitForKeyRelease => {
+                    let mut key_pressed = false;
+                    for i in 0..=Key::F as u8 {
+                        if input.is_pressed(i.try_into().unwrap()) {
+                            key_pressed = true;
+                            break;
+                        }
+                    }
+
+                    if !key_pressed {
+                        self.wait_for_key_state = WaitForKeyState::None;
+                    } else {
+                        self.pc -= OPCODE_SIZE;
+                    }
+                }
+                WaitForKeyState::None => (),
             }
         }
     }
