@@ -37,12 +37,14 @@ pub enum Key {
     F,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum Chip8Error {
     #[error("Internal error from unsupported key code: `{0}`")]
     InternalKeyError(u8),
     #[error("Rom could not be loaded fully into memory; stopping at `{0:#x}`")]
     RomTooBig(u16),
+    #[error("Opcode `{0:#06x}` is not supported")]
+    UnsupportedOpcode(u16),
 }
 
 impl TryFrom<u8> for Key {

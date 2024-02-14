@@ -53,12 +53,24 @@ const OPCODE_SIZE: u16 = 2;
 
 const FLAG_REGISTER: usize = 0xF;
 
+/// Used for keycode `0xFX0A` (wait for keypress). This opcode
+/// requires halting the whole emulator until a key is pressed
+/// and released. This is part of a state machine that achieves that.
 #[derive(PartialEq, Debug)]
 enum WaitForKeyState {
     None,
     WaitForNoKeyPressed,
     CheckForKeyPressed,
     WaitForKeyRelease,
+}
+
+#[derive(Debug, PartialEq)]
+enum ProgramCounter {
+    None,
+    Next,
+    Skip,
+    Set(u16),
+    Pause,
 }
 
 // Chip8 provides hexadecimal digit sprites stored in memory from 0x000 to
@@ -97,6 +109,8 @@ impl<'a> Chip8OutputState<'a> {
         }
     }
 }
+
+type OpcodeResult = Result<ProgramCounter, Chip8Error>;
 
 // Throughout the code, Vx refers to the general purpose registers. There are
 // 15 general purpose registers from V0 to VE. The 16th register is used to
@@ -144,12 +158,22 @@ where
         Ok(())
     }
 
-    pub fn emulate_cycle(&mut self, input: &impl Input) -> Chip8OutputState {
+    pub fn emulate_cycle(&mut self, input: &impl Input) -> Result<Chip8OutputState, Chip8Error> {
         self.draw_on_screen = false;
 
-        self.check_and_process_0xfx0a(input);
+        let input_result = self.check_and_process_0xfx0a(input)?;
+        let mut stack_operation = ProgramCounter::None;
 
-        self.emulate_instruction(input);
+        if input_result != ProgramCounter::Pause {
+            stack_operation = self.emulate_instruction(input)?;
+        }
+
+        match stack_operation {
+            ProgramCounter::Next => self.pc += OPCODE_SIZE,
+            ProgramCounter::Skip => self.pc += OPCODE_SIZE * 2,
+            ProgramCounter::Set(addr) => self.pc = addr,
+            ProgramCounter::None | ProgramCounter::Pause => (),
+        }
 
         // If there's a timer message, update the timers
         while let Ok(timer_operation) = self.timer_rx.try_recv() {
@@ -162,10 +186,14 @@ where
         }
 
         let sound_on = self.sound_timer > 0;
-        Chip8OutputState::new(sound_on, self.draw_on_screen, &self.graphics)
+        Ok(Chip8OutputState::new(
+            sound_on,
+            self.draw_on_screen,
+            &self.graphics,
+        ))
     }
 
-    fn emulate_instruction(&mut self, input: &impl Input) {
+    fn emulate_instruction(&mut self, input: &impl Input) -> OpcodeResult {
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
@@ -175,89 +203,55 @@ where
 
         match self.opcode & 0xF000 {
             // Opcode starts with 0x0
-            0x0000 => {
-                self.opcode_0x0yyy();
-            }
+            0x0000 => self.opcode_0x0yyy(),
 
             // Opcode starts with 0x1
-            0x1000 => {
-                self.opcode_0x1yyy();
-            }
+            0x1000 => self.opcode_0x1yyy(),
 
             // Opcode starts with 0x2
-            0x2000 => {
-                self.opcode_0x2yyy();
-            }
+            0x2000 => self.opcode_0x2yyy(),
 
             // 3xkk - SE Vx, byte
             // Skip next instruction if Vx == kk
-            0x3000 => {
-                self.opcode_0x3yyy();
-            }
+            0x3000 => self.opcode_0x3yyy(),
 
             // Opcodes that start with 0x4
-            0x4000 => {
-                self.opcode_0x4yyy();
-            }
+            0x4000 => self.opcode_0x4yyy(),
 
             // Opcodes that start with 0x5
-            0x5000 => {
-                self.opcode_0x5yyy();
-            }
+            0x5000 => self.opcode_0x5yyy(),
 
             // Opcodes that start with 0x6
-            0x6000 => {
-                self.opcode_0x6yyy();
-            }
+            0x6000 => self.opcode_0x6yyy(),
 
             // Opcodes that start with 0x7
-            0x7000 => {
-                self.opcode_0x7yyy();
-            }
+            0x7000 => self.opcode_0x7yyy(),
 
             // Opcodes that start with 0x8
-            0x8000 => {
-                self.opcode_0x8yyy();
-            }
+            0x8000 => self.opcode_0x8yyy(),
 
             // Opcodes that start with 0x9
-            0x9000 => {
-                self.opcode_0x9yyy();
-            }
+            0x9000 => self.opcode_0x9yyy(),
 
             // Opcodes that start with 0xA
-            0xA000 => {
-                self.opcode_0xayyy();
-            }
+            0xA000 => self.opcode_0xayyy(),
 
             // Opcodes that start with 0xB
-            0xB000 => {
-                self.opcode_0xbyyy();
-            }
+            0xB000 => self.opcode_0xbyyy(),
 
             // Cxkk - RND, byte
             // Set Vx = random byte AND kk
             // Interpreter generates a random number between 0 and 255, which
             // is then ANDed with kk and the result is stored in Vx.
-            0xC000 => {
-                self.opcode_0xcyyy();
-            }
+            0xC000 => self.opcode_0xcyyy(),
 
-            0xD000 => {
-                self.opcode_0xdyyy();
-            }
+            0xD000 => self.opcode_0xdyyy(),
 
-            0xE000 => {
-                self.opcode_0xeyyy(input);
-            }
+            0xE000 => self.opcode_0xeyyy(input),
 
-            0xF000 => {
-                self.opcode_0xfyyy();
-            }
+            0xF000 => self.opcode_0xfyyy(),
 
-            _ => {
-                self.unknown_opcode();
-            }
+            _ => self.unknown_opcode(),
         }
     }
 
@@ -269,54 +263,54 @@ where
         );
     }
 
-    fn unknown_opcode(&mut self) {
+    fn unknown_opcode(&mut self) -> OpcodeResult {
         println!("unknown opcode: {:X}", self.opcode);
-        self.pc += OPCODE_SIZE;
+        Err(Chip8Error::UnsupportedOpcode(self.opcode))
     }
 
     /// Takes care of opcodes that start with 0x0.
-    fn opcode_0x0yyy(&mut self) {
+    fn opcode_0x0yyy(&mut self) -> OpcodeResult {
         match self.opcode & 0x00FF {
             // Clear the screen
             0x00E0 => {
                 self.graphics.clear();
                 self.draw_on_screen = true;
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
             // Return from subroutine
             0x00EE => {
                 // Restore program counter to previous location on stack
                 // before subroutine was called
                 self.sp -= 1;
-                self.pc = self.stack[self.sp as usize];
+                Ok(ProgramCounter::Set(self.stack[self.sp as usize]))
             }
 
             // No other opcodes start with 0x0
-            _ => {
-                self.unknown_opcode();
-            }
+            _ => self.unknown_opcode(),
         }
     }
 
     /// Takes care of opcodes that start with 0x1.
-    fn opcode_0x1yyy(&mut self) {
+    fn opcode_0x1yyy(&mut self) -> OpcodeResult {
         // Only 1 opcode that starts with 0x1: 0x1nnn
         // 0x1nnn - Jump to location nnn
-        self.pc = self.opcode & 0x0FFF;
+        let addr = self.opcode & 0x0FFF;
+        Ok(ProgramCounter::Set(addr))
     }
 
     /// Takes care of opcodes that start with 0x2.
-    fn opcode_0x2yyy(&mut self) {
+    fn opcode_0x2yyy(&mut self) -> OpcodeResult {
         // 0x2adr - Call subroutine at adr
         // Put instruction after program counter on stack and then jump to subroutine
         // location. This prevents the VM from entering into an endless loop.
         self.stack[self.sp as usize] = self.pc + OPCODE_SIZE;
         self.sp += 1;
-        self.pc = self.opcode & 0x0FFF;
+        let addr = self.opcode & 0x0FFF;
+        Ok(ProgramCounter::Set(addr))
     }
 
     /// Takes care of opcodes that start with 0x3.
-    fn opcode_0x3yyy(&mut self) {
+    fn opcode_0x3yyy(&mut self) -> OpcodeResult {
         // 3xkk - SE Vx, byte
         // Skip next instruction if Vx == kk
 
@@ -328,14 +322,14 @@ where
         // If equal, skip next instruction (increment program
         // counter by 2)
         if register_val == comp_val {
-            self.pc += OPCODE_SIZE;
+            return Ok(ProgramCounter::Skip);
         }
 
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0x4.
-    fn opcode_0x4yyy(&mut self) {
+    fn opcode_0x4yyy(&mut self) -> OpcodeResult {
         // 4xkk - SNE Vx, byte
         // Skip next instruction if Vx != kk
 
@@ -347,14 +341,14 @@ where
         // If not equal, skip next instruction (increment program
         // counter by 2)
         if register_val != comp_val {
-            self.pc += OPCODE_SIZE;
+            return Ok(ProgramCounter::Skip);
         }
 
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0x5.
-    fn opcode_0x5yyy(&mut self) {
+    fn opcode_0x5yyy(&mut self) -> OpcodeResult {
         // 5xy0 - SE Vx, Vy
         // Skip next instruction if Vx == Vy
         let (x, y) = self.get_regs_x_y();
@@ -364,14 +358,14 @@ where
         // If values are equal, skip next instruction (increment
         // program counter by 2)
         if vx_val == vy_val {
-            self.pc += OPCODE_SIZE;
+            return Ok(ProgramCounter::Skip);
         }
 
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0x6.
-    fn opcode_0x6yyy(&mut self) {
+    fn opcode_0x6yyy(&mut self) -> OpcodeResult {
         // 6xkk - LD Vx, byte
         // Set Vx = kk
         let val = (self.opcode & 0x00FF) as u8;
@@ -379,11 +373,11 @@ where
 
         // Set register to value
         self.registers[x] = val;
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0x7.
-    fn opcode_0x7yyy(&mut self) {
+    fn opcode_0x7yyy(&mut self) -> OpcodeResult {
         // 7xkk - ADD Vx, byte
         // Set Vx = Vx + kk
         // Get value and register
@@ -391,11 +385,11 @@ where
         let x = ((self.opcode & 0x0F00) >> 8) as usize;
 
         self.registers[x] = self.registers[x].wrapping_add(val);
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0x8.
-    fn opcode_0x8yyy(&mut self) {
+    fn opcode_0x8yyy(&mut self) -> OpcodeResult {
         // Last nibble identifies what the opcode does
         match self.opcode & 0x000F {
             // 8xy0 - LD Vx, Vy
@@ -404,7 +398,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] = self.registers[y];
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy1 - OR Vx, Vy
@@ -413,7 +407,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] |= self.registers[y];
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy2 - AND Vx, Vy
@@ -422,7 +416,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] &= self.registers[y];
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy3 - XOR Vx, Vy
@@ -431,7 +425,7 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] ^= self.registers[y];
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy4 - ADD Vx, Vy
@@ -447,7 +441,7 @@ where
                 self.registers[x] = val;
                 self.registers[FLAG_REGISTER] = flag;
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy5 - SUB Vx, Vy
@@ -467,7 +461,7 @@ where
                 self.registers[x] = val;
                 self.registers[FLAG_REGISTER] = flag;
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy6 - SHR Vx {, Vy}
@@ -481,7 +475,7 @@ where
                 self.registers[x] >>= 1;
 
                 self.registers[FLAG_REGISTER] = flag;
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xy7 - SUBN Vx, Vy
@@ -501,7 +495,7 @@ where
                 self.registers[x] = val;
                 self.registers[FLAG_REGISTER] = flag;
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // 8xyE - SHL Vx {, Vy}
@@ -515,49 +509,47 @@ where
                 self.registers[x] <<= 1;
                 self.registers[FLAG_REGISTER] = flag;
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // No other opcodes start with 0x8
-            _ => {
-                self.unknown_opcode();
-            }
+            _ => self.unknown_opcode(),
         }
     }
 
     /// Takes care of opcodes that start with 0x9
-    fn opcode_0x9yyy(&mut self) {
+    fn opcode_0x9yyy(&mut self) -> OpcodeResult {
         // 9xy0 - SNE Vx, Vy
         // Skip next instruction if Vx != Vy
         let (x, y) = self.get_regs_x_y();
 
         if self.registers[x] != self.registers[y] {
-            self.pc += OPCODE_SIZE;
+            return Ok(ProgramCounter::Skip);
         }
 
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0xA
-    fn opcode_0xayyy(&mut self) {
+    fn opcode_0xayyy(&mut self) -> OpcodeResult {
         // Annn - LD I, addr
         // Set I = nnn
         // Get address and set index register
         let val = self.opcode & 0x0FFF;
         self.ir = val;
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0xB
-    fn opcode_0xbyyy(&mut self) {
+    fn opcode_0xbyyy(&mut self) -> OpcodeResult {
         // Bnnn - JP V0, nnn
         // Jump to location nnn + V0 (set pc = nnn + V0)
         let val = self.opcode & 0x0FFF;
-        self.pc = val + self.registers[0x0] as u16;
+        Ok(ProgramCounter::Set(val + self.registers[0x0] as u16))
     }
 
     /// Takes care of opcodes that start with 0xC
-    fn opcode_0xcyyy(&mut self) {
+    fn opcode_0xcyyy(&mut self) -> OpcodeResult {
         // Cxkk - RND, byte
         // Set Vx = random byte AND kk
         // Interpreter generates a random number between 0 and 255, which
@@ -568,11 +560,11 @@ where
         let rand_val = rand::thread_rng().gen_range(0..256) as u8;
 
         self.registers[x] = rand_val & kk;
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that start with 0xD
-    fn opcode_0xdyyy(&mut self) {
+    fn opcode_0xdyyy(&mut self) -> OpcodeResult {
         // Dxyn - DRW Vx, Vy, nibble
         // Display n-byte sprite starting at memory location I at (Vx, Vy),
         // set VF = collision
@@ -591,12 +583,12 @@ where
             self.registers[FLAG_REGISTER] = 0;
         }
 
-        self.pc += OPCODE_SIZE;
+        Ok(ProgramCounter::Next)
     }
 
     /// Takes care of opcodes that are related to input such as checking whether
     /// a key is pressed or not pressed, and waiting until a key is pressed.
-    fn opcode_0xeyyy(&mut self, input: &impl Input) {
+    fn opcode_0xeyyy(&mut self, input: &impl Input) -> OpcodeResult {
         match self.opcode & 0xFF {
             // Ex9E - SKP Vx
             // Skips the next instruction if the key with the value of Vx is
@@ -606,10 +598,10 @@ where
                 let (x, _) = self.get_regs_x_y();
 
                 if input.is_pressed((self.registers[x]).try_into().unwrap()) {
-                    self.pc += OPCODE_SIZE;
+                    return Ok(ProgramCounter::Skip);
                 }
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // ExA1 - SKNP Vx
@@ -620,19 +612,17 @@ where
                 let (x, _) = self.get_regs_x_y();
 
                 if !input.is_pressed((self.registers[x]).try_into().unwrap()) {
-                    self.pc += OPCODE_SIZE;
+                    return Ok(ProgramCounter::Skip);
                 }
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
-            _ => {
-                self.unknown_opcode();
-            }
+            _ => self.unknown_opcode(),
         }
     }
 
-    fn opcode_0xfyyy(&mut self) {
+    fn opcode_0xfyyy(&mut self) -> OpcodeResult {
         match self.opcode & 0xFF {
             // Fx07 - LD Vx, DT
             // Set Vx = delay timer value.
@@ -642,7 +632,7 @@ where
                 self.registers[x] = self.delay_timer;
                 println!("self.registers[x] = delay timer");
                 println!("self.registers[{:#x}] = {}", x, self.delay_timer);
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx0A - LD Vx, K
@@ -657,7 +647,7 @@ where
                     self.wait_for_key_state = WaitForKeyState::WaitForNoKeyPressed;
                 }
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Pause)
             }
 
             // Fx15 - LD DT, Vx
@@ -668,7 +658,7 @@ where
                 self.delay_timer = self.registers[x];
                 println!("delay timer = self.registers[x]");
                 println!("delay timer = {} (register[{:#}]", self.registers[x], x);
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx18 - LD ST, Vx
@@ -677,7 +667,7 @@ where
             0x18 => {
                 let (x, _) = self.get_regs_x_y();
                 self.sound_timer = self.registers[x];
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx1E - ADD I, Vx
@@ -686,7 +676,7 @@ where
             0x1E => {
                 let (x, _) = self.get_regs_x_y();
                 self.ir += self.registers[x] as u16;
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx29 - LD F, Vx
@@ -699,7 +689,7 @@ where
                 // 0x0, so multiplying the value in Vx by 5 will get us the
                 // address of the sprite
                 self.ir = self.registers[x] as u16 * 5;
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx33 - LD B, Vx
@@ -718,7 +708,7 @@ where
                 self.memory[self.ir as usize + 1] = tens;
                 self.memory[self.ir as usize + 2] = ones;
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx55 - LD [I], Vx
@@ -733,7 +723,7 @@ where
                     addr += REG_SIZE;
                 }
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
             // Fx65 - LD Vx, [I]
@@ -748,12 +738,10 @@ where
                     addr += REG_SIZE;
                 }
 
-                self.pc += OPCODE_SIZE;
+                Ok(ProgramCounter::Next)
             }
 
-            _ => {
-                self.unknown_opcode();
-            }
+            _ => self.unknown_opcode(),
         }
     }
 
@@ -761,7 +749,7 @@ where
     // to be released before registering the key pressed. It also
     // needs to halt the whole emulator, except for timers.
     // Timers need to continue to decrement.
-    fn check_and_process_0xfx0a(&mut self, input: &impl Input) {
+    fn check_and_process_0xfx0a(&mut self, input: &impl Input) -> OpcodeResult {
         if self.wait_for_key_state != WaitForKeyState::None {
             match self.wait_for_key_state {
                 WaitForKeyState::WaitForNoKeyPressed => {
@@ -773,8 +761,8 @@ where
                     }
                     if !key_pressed {
                         self.wait_for_key_state = WaitForKeyState::CheckForKeyPressed;
-                        self.pc -= OPCODE_SIZE;
                     }
+                    Ok(ProgramCounter::Pause)
                 }
                 WaitForKeyState::CheckForKeyPressed => {
                     for i in 0..=Key::F as u8 {
@@ -784,7 +772,7 @@ where
                             break;
                         }
                     }
-                    self.pc -= OPCODE_SIZE;
+                    Ok(ProgramCounter::Pause)
                 }
                 WaitForKeyState::WaitForKeyRelease => {
                     let mut key_pressed = false;
@@ -797,12 +785,15 @@ where
 
                     if !key_pressed {
                         self.wait_for_key_state = WaitForKeyState::None;
+                        Ok(ProgramCounter::Next)
                     } else {
-                        self.pc -= OPCODE_SIZE;
+                        Ok(ProgramCounter::Pause)
                     }
                 }
-                WaitForKeyState::None => (),
+                WaitForKeyState::None => Ok(ProgramCounter::Next),
             }
+        } else {
+            Ok(ProgramCounter::None)
         }
     }
 }
@@ -814,8 +805,8 @@ mod tests {
     use crate::graphics::Graphics;
     use crate::traits::GraphicsBuffer;
 
-    use super::Chip8;
     use super::FLAG_REGISTER;
+    use super::{Chip8, ProgramCounter};
 
     fn create_chip8(opcode: u16) -> Chip8<Graphics> {
         let graphics = Graphics::new();
@@ -844,10 +835,10 @@ mod tests {
                     chip8.registers[x] = reg1_start_val;
                     chip8.registers[y] = reg2_start_val;
 
-                    chip8.$test_fn();
+                    let result = chip8.$test_fn();
                     assert_eq!(chip8.registers[x], reg1_end);
                     assert_eq!(chip8.registers[FLAG_REGISTER], carry);
-                    assert_eq!(chip8.pc, 0x202);
+                    assert_eq!(result, Ok(ProgramCounter::Next));
                 }
             )*
         }
@@ -859,9 +850,9 @@ mod tests {
         // Draw the first sprite digit - digits are loaded starting at 0x0 and are all 5 bytes tall
         chip8.graphics.draw(0, 0, 5, 0, &chip8.memory);
 
-        chip8.opcode_0x0yyy();
+        let pc_op = chip8.opcode_0x0yyy();
 
-        assert_eq!(chip8.pc, 0x202);
+        assert_eq!(pc_op, Ok(ProgramCounter::Next));
 
         let screen = chip8.graphics.buffer();
 
@@ -889,7 +880,9 @@ mod tests {
         chip8.registers[x] = 123;
         chip8.ir = 0x500;
 
-        chip8.opcode_0xfyyy();
+        let result = chip8.opcode_0xfyyy();
+
+        assert_eq!(result, Ok(ProgramCounter::Next));
         assert_eq!(chip8.memory[chip8.ir as usize], 1);
         assert_eq!(chip8.memory[chip8.ir as usize + 1], 2);
         assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
@@ -905,8 +898,9 @@ mod tests {
 
         chip8.ir = 0x500;
 
-        chip8.opcode_0xfyyy();
+        let result = chip8.opcode_0xfyyy();
 
+        assert_eq!(result, Ok(ProgramCounter::Next));
         assert_eq!(chip8.memory[chip8.ir as usize], 1);
         assert_eq!(chip8.memory[chip8.ir as usize + 1], 2);
         assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
@@ -925,7 +919,9 @@ mod tests {
             chip8.memory[chip8.ir as usize + i] = (i + 1) as u8;
         }
 
-        chip8.opcode_0xfyyy();
+        let result = chip8.opcode_0xfyyy();
+
+        assert_eq!(result, Ok(ProgramCounter::Next));
 
         assert_eq!(chip8.registers[0], 1);
         assert_eq!(chip8.registers[1], 2);
@@ -940,16 +936,16 @@ mod tests {
         let mut chip8 = create_chip8(0x1200);
         chip8.pc = 0x300;
 
-        chip8.opcode_0x1yyy();
-        assert_eq!(chip8.pc, 0x200);
+        let result = chip8.opcode_0x1yyy();
+        assert_eq!(result, Ok(ProgramCounter::Set(0x200)));
     }
 
     #[test]
     fn test_2nnn_opcode() {
         let mut chip8 = create_chip8(0x2300);
-        chip8.opcode_0x2yyy();
+        let result = chip8.opcode_0x2yyy();
 
-        assert_eq!(chip8.pc, 0x300);
+        assert_eq!(result, Ok(ProgramCounter::Set(0x300)));
         assert_eq!(chip8.stack[0], 0x202);
         assert_eq!(chip8.sp, 1);
     }
@@ -959,14 +955,14 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let (opcode, reg_start_val, ending_sp) = $values;
+                    let (opcode, reg_start_val, pc_operation) = $values;
                     let mut chip8 = create_chip8(opcode);
                     let (x, _) = chip8.get_regs_x_y();
 
                     chip8.registers[x] = reg_start_val;
 
-                    chip8.$test_fn();
-                    assert_eq!(chip8.pc, ending_sp);
+                    let result = chip8.$test_fn();
+                    assert_eq!(result, pc_operation);
                 }
             )*
         }
@@ -975,10 +971,10 @@ mod tests {
     // First number is opcode, second is register value, third is
     // expected program counter value
     test_skip_value_opcodes! {
-        test_0x3yyy_eq: (opcode_0x3yyy, (0x3012, 0x12, 0x204)),
-        test_0x3yyy_neq: (opcode_0x3yyy, (0x3012, 0x10, 0x202)),
-        test_0x4yyy_eq: (opcode_0x4yyy, (0x3012, 0x12, 0x202)),
-        test_0x4yyy_neq: (opcode_0x4yyy, (0x3012, 0x10, 0x204)),
+        test_0x3yyy_eq: (opcode_0x3yyy, (0x3012, 0x12, Ok(ProgramCounter::Skip))),
+        test_0x3yyy_neq: (opcode_0x3yyy, (0x3012, 0x10, Ok(ProgramCounter::Next))),
+        test_0x4yyy_eq: (opcode_0x4yyy, (0x3012, 0x12, Ok(ProgramCounter::Next))),
+        test_0x4yyy_neq: (opcode_0x4yyy, (0x3012, 0x10, Ok(ProgramCounter::Skip))),
 
     }
 
@@ -987,29 +983,29 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let (opcode, reg1_start_val, reg2_start_val, ending_pc) = $values;
+                    let (opcode, reg1_start_val, reg2_start_val, pc_operation) = $values;
                     let mut chip8 = create_chip8(opcode);
                     let (x, y) = chip8.get_regs_x_y();
 
                     chip8.registers[x] = reg1_start_val;
                     chip8.registers[y] = reg2_start_val;
 
-                    chip8.$test_fn();
-                    assert_eq!(chip8.pc, ending_pc);
+                    let result = chip8.$test_fn();
+                    assert_eq!(result, pc_operation);
                 }
             )*
         }
     }
 
     test_skip_register_opcodes! {
-        test_0x3xyy_eq: (opcode_0x3yyy, (0x3110, 0x10, 0x10, 0x204)),
-        test_0x3xyy_neq: (opcode_0x3yyy, (0x3120, 0x10, 0x10, 0x202)),
-        test_0x4xyy_eq: (opcode_0x4yyy, (0x3110, 0x10, 0x10, 0x202)),
-        test_0x4xyy_neq: (opcode_0x4yyy, (0x3120, 0x10, 0x10, 0x204)),
-        test_0x5yyy_eq: (opcode_0x5yyy, (0x5120, 0x10, 0x10, 0x204)),
-        test_0x5yyy_neq: (opcode_0x5yyy, (0x5120, 0x11, 0x10, 0x202)),
-        test_0x9yyy_eq: (opcode_0x9yyy, (0x5120, 0x10, 0x10, 0x202)),
-        test_0x9yyy_neq: (opcode_0x9yyy, (0x5120, 0x11, 0x10, 0x204)),
+        test_0x3xyy_eq: (opcode_0x3yyy, (0x3110, 0x10, 0x10, Ok(ProgramCounter::Skip))),
+        test_0x3xyy_neq: (opcode_0x3yyy, (0x3120, 0x10, 0x10, Ok(ProgramCounter::Next))),
+        test_0x4xyy_eq: (opcode_0x4yyy, (0x3110, 0x10, 0x10, Ok(ProgramCounter::Next))),
+        test_0x4xyy_neq: (opcode_0x4yyy, (0x3120, 0x10, 0x10, Ok(ProgramCounter::Skip))),
+        test_0x5yyy_eq: (opcode_0x5yyy, (0x5120, 0x10, 0x10, Ok(ProgramCounter::Skip))),
+        test_0x5yyy_neq: (opcode_0x5yyy, (0x5120, 0x11, 0x10, Ok(ProgramCounter::Next))),
+        test_0x9yyy_eq: (opcode_0x9yyy, (0x5120, 0x10, 0x10, Ok(ProgramCounter::Next))),
+        test_0x9yyy_neq: (opcode_0x9yyy, (0x5120, 0x11, 0x10, Ok(ProgramCounter::Skip))),
     }
 
     #[test]
@@ -1018,9 +1014,10 @@ mod tests {
         let (x, _) = chip8.get_regs_x_y();
 
         chip8.registers[x] = 0;
-        chip8.opcode_0x6yyy();
+        let result = chip8.opcode_0x6yyy();
 
         assert_eq!(chip8.registers[1], 0x20);
+        assert_eq!(result, Ok(ProgramCounter::Next));
     }
 
     #[test]
@@ -1029,17 +1026,19 @@ mod tests {
         let (x, _) = chip8.get_regs_x_y();
 
         chip8.registers[x] = 0x10;
-        chip8.opcode_0x7yyy();
+        let result = chip8.opcode_0x7yyy();
 
         assert_eq!(chip8.registers[1], 0x30);
+        assert_eq!(result, Ok(ProgramCounter::Next));
     }
 
     #[test]
     fn test_0xayyy() {
         let mut chip8 = create_chip8(0xA120);
-        chip8.opcode_0xayyy();
+        let result = chip8.opcode_0xayyy();
 
         assert_eq!(chip8.ir, 0x120);
+        assert_eq!(result, Ok(ProgramCounter::Next));
     }
 
     #[test]
@@ -1047,9 +1046,9 @@ mod tests {
         let mut chip8 = create_chip8(0xB120);
         chip8.registers[0] = 0xFF;
 
-        chip8.opcode_0xbyyy();
+        let result = chip8.opcode_0xbyyy();
 
-        assert_eq!(chip8.pc, 0x120 + 0xFF);
+        assert_eq!(result, Ok(ProgramCounter::Set(0xFF + 0x120)));
     }
 
     // First number is register A, second is register B

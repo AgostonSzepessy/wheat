@@ -50,7 +50,7 @@ fn main() -> Result<(), String> {
     }
 
     while let InputUpdate::Continue = input.update() {
-        let output = chip8.emulate_cycle(input.input());
+        let output = chip8.emulate_cycle(input.input()).unwrap();
 
         display.draw(output.graphics.buffer());
 
