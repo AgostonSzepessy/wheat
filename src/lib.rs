@@ -90,13 +90,20 @@ pub struct Quirks {
     /// Games from the 1970s and 1980s might rely on it being incremented.
     /// Modern games might rely on it not being incremented.
     pub increment_ir: bool,
+
+    /// This applies to the shift instructions, `8XY6` and `8XYE`. Should register `VX` be
+    /// set to the value of register `VY` before shifting?
+    /// The original COSMAC VIP would set `VX` to `VY` and then perform the shift. Starting with
+    /// CHIP-48 and SUPER-CHIP, `VX` was shifted in place, and `VY` was ignored completely.
+    pub use_vy_in_shift: bool,
 }
 
 impl Quirks {
-    pub fn new(reset_vf: bool, increment_ir: bool) -> Self {
+    pub fn new(reset_vf: bool, increment_ir: bool, shift: bool) -> Self {
         Self {
             reset_vf,
             increment_ir,
+            use_vy_in_shift: shift,
         }
     }
 }
@@ -106,6 +113,7 @@ impl Default for Quirks {
         Self {
             reset_vf: true,
             increment_ir: true,
+            use_vy_in_shift: true,
         }
     }
 }

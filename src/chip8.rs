@@ -400,6 +400,14 @@ where
             };
         }
 
+        macro_rules! set_vx_to_vy_for_shift {
+            ($x: ident, $y: ident) => {
+                if self.quirks.use_vy_in_shift {
+                    self.registers[$x] = self.registers[$y];
+                }
+            };
+        }
+
         // Last nibble identifies what the opcode does
         match self.opcode & 0x000F {
             // 8xy0 - LD Vx, Vy
@@ -485,7 +493,9 @@ where
             // If least significant bit of Vx is 1, then VF is set to 1,
             // otherwise 0. Then Vx is divided by 2
             0x0006 => {
-                let (x, _) = self.get_regs_x_y();
+                let (x, y) = self.get_regs_x_y();
+
+                set_vx_to_vy_for_shift!(x, y);
 
                 let flag = self.registers[x] & 0x1;
                 self.registers[x] >>= 1;
@@ -518,7 +528,8 @@ where
             // Set Vx = Vx SHL 1
             // If most significant bit of Vx is 1, set VF to 1, otherwise 0.
             0x000E => {
-                let (x, _) = self.get_regs_x_y();
+                let (x, y) = self.get_regs_x_y();
+                set_vx_to_vy_for_shift!(x, y);
 
                 let flag = (self.registers[x] >> 7) & 0x1;
 
@@ -1142,10 +1153,18 @@ mod tests {
         test_sub_v3_vf_2: (opcode_0x8yyy, (0x83F5, 5, 6, 255, 0)),
         test_sub_v3_vf_3: (opcode_0x8yyy, (0x83F5, 5, 4, 1, 1)),
 
+        // SHR Vx, Vy
+        // result is third column, carry is fourth
         test_shr_0: (opcode_0x8yyy, (0x8AB6, 0, 0, 0, 0)),
-        test_shr_1: (opcode_0x8yyy, (0x8AB6, 1, 0, 0, 1)),
-        test_shr_2: (opcode_0x8yyy, (0x8AB6, 2, 0, 1, 0)),
-        test_shr_3: (opcode_0x8yyy, (0x8AB6, 3, 0, 1, 1)),
+        test_shr_1: (opcode_0x8yyy, (0x8AB6, 1, 0, 0, 0)),
+        test_shr_2: (opcode_0x8yyy, (0x8AB6, 2, 0, 0, 0)),
+        test_shr_3: (opcode_0x8yyy, (0x8AB6, 3, 0, 0, 0)),
+
+        // Set Vx = Vy, then shift right by 1
+        test_shr_1_1: (opcode_0x8yyy, (0x8AB6, 1, 1, 0, 1)),
+        test_shr_2_1: (opcode_0x8yyy, (0x8AB6, 2, 2, 1, 0)),
+        test_shr_3_1: (opcode_0x8yyy, (0x8AB6, 3, 3, 1, 1)),
+        test_shr_5_1: (opcode_0x8yyy, (0x8AB6, 0, 5, 2, 1)),
 
         test_subn_1_1: (opcode_0x8yyy, (0x8AB7, 1, 1, 0, 1)),
         test_subn_1_2: (opcode_0x8yyy, (0x8AB7, 1, 2, 1, 1)),
@@ -1153,10 +1172,15 @@ mod tests {
         test_subn_v3_vf: (opcode_0x8yyy, (0x83F7, 5, 4, 255, 0)),
 
         test_shl_0: (opcode_0x8yyy, (0x8ABE, 0, 0, 0, 0)),
-        test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 0)),
-        test_shl_2: (opcode_0x8yyy, (0x8ABE, 2, 0, 4, 0)),
-        test_shl_3: (opcode_0x8yyy, (0x8ABE, 128, 0, 0, 1)),
-        test_shl_4: (opcode_0x8yyy, (0x8ABE, 129, 0, 2, 1)),
+        test_shl_1: (opcode_0x8yyy, (0x8ABE, 1, 0, 0, 0)),
+        test_shl_2: (opcode_0x8yyy, (0x8ABE, 2, 0, 0, 0)),
+        test_shl_3: (opcode_0x8yyy, (0x8ABE, 128, 0, 0, 0)),
+        test_shl_4: (opcode_0x8yyy, (0x8ABE, 129, 0, 0, 0)),
+
+        test_shl_1_1: (opcode_0x8yyy, (0x8ABE, 0, 1, 2, 0)),
+        test_shl_2_1: (opcode_0x8yyy, (0x8ABE, 0, 2, 4, 0)),
+        test_shl_3_1: (opcode_0x8yyy, (0x8ABE, 0, 128, 0, 1)),
+        test_shl_4_1: (opcode_0x8yyy, (0x8ABE, 0, 129, 2, 1)),
     }
 
     macro_rules! test_arithmetic_no_reset_vf {
@@ -1210,5 +1234,40 @@ mod tests {
         test_xor_0_0_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 0, 0, 0)),
         test_xor_0_1_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 0, 1, 1)),
         test_xor_1_0_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 1, 0, 1)),
+    }
+
+    macro_rules! test_arithmetic_no_shift {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg1_start_val, reg2_start_val, reg1_end, carry) = $values;
+                    let quirks = QuirksBuilder::default().use_vy_in_shift(false).build().unwrap();
+                    let mut chip8 = create_chip8_with_quirks(opcode, quirks);
+                    let (x, y) = chip8.get_regs_x_y();
+
+                    chip8.registers[x] = reg1_start_val;
+                    chip8.registers[y] = reg2_start_val;
+
+                    let result = chip8.$test_fn();
+                    assert_eq!(chip8.registers[x], reg1_end);
+                    assert_eq!(chip8.registers[FLAG_REGISTER], carry);
+                    assert_eq!(result, Ok(ProgramCounter::Next));
+                }
+            )*
+        }
+    }
+
+    test_arithmetic_no_shift! {
+        test_shr_0_no_shift: (opcode_0x8yyy, (0x8AB6, 0, 0, 0, 0)),
+        test_shr_1_no_shift: (opcode_0x8yyy, (0x8AB6, 1, 0, 0, 1)),
+        test_shr_2_no_shift: (opcode_0x8yyy, (0x8AB6, 2, 0, 1, 0)),
+        test_shr_3_no_shift: (opcode_0x8yyy, (0x8AB6, 3, 0, 1, 1)),
+
+        test_shl_0_no_shift: (opcode_0x8yyy, (0x8ABE, 0, 0, 0, 0)),
+        test_shl_1_no_shift: (opcode_0x8yyy, (0x8ABE, 1, 0, 2, 0)),
+        test_shl_2_no_shift: (opcode_0x8yyy, (0x8ABE, 2, 0, 4, 0)),
+        test_shl_3_no_shift: (opcode_0x8yyy, (0x8ABE, 128, 0, 0, 1)),
+        test_shl_4_no_shift: (opcode_0x8yyy, (0x8ABE, 129, 0, 2, 1)),
     }
 }
