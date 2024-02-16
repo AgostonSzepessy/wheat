@@ -5,6 +5,7 @@ use chip8::{
     input::{InputUpdate, SdlInput},
     timer::TimerOperation,
     traits::Display,
+    Quirks,
 };
 use measurements::Frequency;
 
@@ -38,7 +39,7 @@ fn main() -> Result<(), String> {
     let rom = RomDriver::new(&args[1]);
     let mut input = SdlInput::new(&sdl_context, input_rx);
     let graphics = Graphics::new();
-    let mut chip8 = Chip8::new(graphics, timer_rx);
+    let mut chip8 = Chip8::new(graphics, timer_rx, Quirks::default());
 
     // Start with 500Hz, make this adjustable later
     let chip8_freq = Frequency::from_hertz(500.into());

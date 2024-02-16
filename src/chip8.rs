@@ -5,7 +5,7 @@ use rand::Rng;
 
 use crate::timer::TimerOperation;
 use crate::traits::{GraphicsBuffer, Input, Rom};
-use crate::{Chip8Error, Key};
+use crate::{Chip8Error, Key, Quirks};
 
 #[derive(Debug)]
 pub struct Chip8<G> {
@@ -32,6 +32,7 @@ pub struct Chip8<G> {
     draw_on_screen: bool,
     wait_for_keypress_register: u8,
     wait_for_key_state: WaitForKeyState,
+    quirks: Quirks,
 }
 
 // The default address at which the application is loaded at
@@ -120,7 +121,7 @@ impl<G> Chip8<G>
 where
     G: GraphicsBuffer,
 {
-    pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>) -> Self {
+    pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>, quirks: Quirks) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
         for i in 0..HEX_DIGITS.len() {
@@ -142,6 +143,7 @@ where
             draw_on_screen: false,
             wait_for_keypress_register: 0,
             wait_for_key_state: WaitForKeyState::None,
+            quirks,
         }
     }
 
@@ -390,6 +392,14 @@ where
 
     /// Takes care of opcodes that start with 0x8.
     fn opcode_0x8yyy(&mut self) -> OpcodeResult {
+        macro_rules! reset_vf {
+            () => {
+                if self.quirks.reset_vf {
+                    self.registers[FLAG_REGISTER] = 0;
+                }
+            };
+        }
+
         // Last nibble identifies what the opcode does
         match self.opcode & 0x000F {
             // 8xy0 - LD Vx, Vy
@@ -407,6 +417,8 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] |= self.registers[y];
+                reset_vf!();
+
                 Ok(ProgramCounter::Next)
             }
 
@@ -416,6 +428,8 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] &= self.registers[y];
+                reset_vf!();
+
                 Ok(ProgramCounter::Next)
             }
 
@@ -425,6 +439,8 @@ where
                 let (x, y) = self.get_regs_x_y();
 
                 self.registers[x] ^= self.registers[y];
+                reset_vf!();
+
                 Ok(ProgramCounter::Next)
             }
 
@@ -446,7 +462,7 @@ where
 
             // 8xy5 - SUB Vx, Vy
             // Vx= Vx - Vy, set VF = NOT borrow
-            // If Vx > Vy, then VF is set to 1, otherwise 0
+            // If Vx >= Vy, then VF is set to 1, otherwise 0
             0x0005 => {
                 let (x, y) = self.get_regs_x_y();
 
@@ -480,7 +496,7 @@ where
 
             // 8xy7 - SUBN Vx, Vy
             // Set Vx = Vy - Vx, set VF = NOT borrow
-            // If Vy > Vx, then VF = 1, otherwise VF = 0.
+            // If Vy >= Vx, then VF = 1, otherwise VF = 0.
             0x0007 => {
                 let (x, y) = self.get_regs_x_y();
 
@@ -804,6 +820,7 @@ mod tests {
 
     use crate::graphics::Graphics;
     use crate::traits::GraphicsBuffer;
+    use crate::Quirks;
 
     use super::FLAG_REGISTER;
     use super::{Chip8, ProgramCounter};
@@ -811,37 +828,20 @@ mod tests {
     fn create_chip8(opcode: u16) -> Chip8<Graphics> {
         let graphics = Graphics::new();
         let (_, timer_rx) = mpsc::channel();
-        let mut chip8 = Chip8::new(graphics, timer_rx);
+        let mut chip8 = Chip8::new(graphics, timer_rx, Quirks::default());
         chip8.opcode = opcode;
         chip8
     }
 
-    /// Tests the arithmetic operations of the Chip8 such as addition,
-    /// subtraction, multiplication, division, and bitwise operations.
-    /// `name` is the name of the test, `test_fn` is the function to be
-    /// tested, and `values` is a tuple containing the values that the test
-    /// uses, in this order: the opcode, the initial value in register "x", the
-    /// initial value in register "y", the final value in register "x", and
-    /// the expected value of the carry register.
-    macro_rules! test_arithmetic {
-        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
-            $(
-                #[test]
-                fn $name() {
-                    let (opcode, reg1_start_val, reg2_start_val, reg1_end, carry) = $values;
-                    let mut chip8 = create_chip8(opcode);
-                    let (x, y) = chip8.get_regs_x_y();
+    fn create_chip8_no_reset_vf(opcode: u16) -> Chip8<Graphics> {
+        let graphics = Graphics::new();
 
-                    chip8.registers[x] = reg1_start_val;
-                    chip8.registers[y] = reg2_start_val;
+        let quirks = Quirks { reset_vf: false };
 
-                    let result = chip8.$test_fn();
-                    assert_eq!(chip8.registers[x], reg1_end);
-                    assert_eq!(chip8.registers[FLAG_REGISTER], carry);
-                    assert_eq!(result, Ok(ProgramCounter::Next));
-                }
-            )*
-        }
+        let (_, timer_rx) = mpsc::channel();
+        let mut chip8 = Chip8::new(graphics, timer_rx, quirks);
+        chip8.opcode = opcode;
+        chip8
     }
 
     #[test]
@@ -1051,6 +1051,34 @@ mod tests {
         assert_eq!(result, Ok(ProgramCounter::Set(0xFF + 0x120)));
     }
 
+    /// Tests the arithmetic operations of the Chip8 such as addition,
+    /// subtraction, multiplication, division, and bitwise operations.
+    /// `name` is the name of the test, `test_fn` is the function to be
+    /// tested, and `values` is a tuple containing the values that the test
+    /// uses, in this order: the opcode, the initial value in register "x", the
+    /// initial value in register "y", the final value in register "x", and
+    /// the expected value of the carry register.
+    macro_rules! test_arithmetic {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg1_start_val, reg2_start_val, reg1_end, carry) = $values;
+                    let mut chip8 = create_chip8(opcode);
+                    let (x, y) = chip8.get_regs_x_y();
+
+                    chip8.registers[x] = reg1_start_val;
+                    chip8.registers[y] = reg2_start_val;
+
+                    let result = chip8.$test_fn();
+                    assert_eq!(chip8.registers[x], reg1_end);
+                    assert_eq!(chip8.registers[FLAG_REGISTER], carry);
+                    assert_eq!(result, Ok(ProgramCounter::Next));
+                }
+            )*
+        }
+    }
+
     // First number is register A, second is register B
     test_arithmetic! {
         test_store: (opcode_0x8yyy, (0x8AB0, 1, 2, 2, 0)),
@@ -1095,5 +1123,55 @@ mod tests {
         test_shl_2: (opcode_0x8yyy, (0x8ABE, 2, 0, 4, 0)),
         test_shl_3: (opcode_0x8yyy, (0x8ABE, 128, 0, 0, 1)),
         test_shl_4: (opcode_0x8yyy, (0x8ABE, 129, 0, 2, 1)),
+    }
+
+    macro_rules! test_arithmetic_no_reset_vf {
+        ($($name:ident: ($test_fn:ident, $values:expr),)*) => {
+            $(
+                #[test]
+                fn $name() {
+                    let (opcode, reg1_start_val, reg2_start_val, reg1_end) = $values;
+                    let mut chip8 = create_chip8_no_reset_vf(0x83F5);
+                    let (x, y) = chip8.get_regs_x_y();
+
+                    // Setup this test so we get 0 - 1, which will set the carry flag
+                    chip8.registers[x] = 1;
+                    chip8.registers[y] = 0;
+
+                    let result = chip8.opcode_0x8yyy();
+                    assert_eq!(chip8.registers[FLAG_REGISTER], 1);
+                    assert_eq!(result, Ok(ProgramCounter::Next));
+
+                    // Now do the actual opcode
+                    chip8.opcode = opcode;
+                    let (x, y) = chip8.get_regs_x_y();
+
+                    chip8.registers[x] = reg1_start_val;
+                    chip8.registers[y] = reg2_start_val;
+
+                    let result = chip8.$test_fn();
+                    assert_eq!(chip8.registers[x], reg1_end);
+                    assert_eq!(chip8.registers[FLAG_REGISTER], 1);
+                    assert_eq!(result, Ok(ProgramCounter::Next));
+                }
+            )*
+        }
+    }
+
+    test_arithmetic_no_reset_vf! {
+        test_or_1_1_no_reset_vf: (opcode_0x8yyy, (0x8AB1, 1, 1, 1)),
+        test_or_0_0_no_reset_vf: (opcode_0x8yyy, (0x8AB1, 0, 0, 0)),
+        test_or_0_1_no_reset_vf: (opcode_0x8yyy, (0x8AB1, 0, 1, 1)),
+        test_or_1_0_no_reset_vf: (opcode_0x8yyy, (0x8AB1, 1, 0, 1)),
+
+        test_and_1_1_no_reset_vf: (opcode_0x8yyy, (0x8AB2, 1, 1, 1)),
+        test_and_0_0_no_reset_vf: (opcode_0x8yyy, (0x8AB2, 0, 0, 0)),
+        test_and_0_1_no_reset_vf: (opcode_0x8yyy, (0x8AB2, 0, 1, 0)),
+        test_and_1_0_no_reset_vf: (opcode_0x8yyy, (0x8AB2, 1, 0, 0)),
+
+        test_xor_1_1_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 1, 1, 0)),
+        test_xor_0_0_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 0, 0, 0)),
+        test_xor_0_1_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 0, 1, 1)),
+        test_xor_1_0_no_reset_vf: (opcode_0x8yyy, (0x8AB3, 1, 0, 1)),
     }
 }

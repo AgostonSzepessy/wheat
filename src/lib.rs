@@ -72,3 +72,14 @@ impl TryFrom<u8> for Key {
         }
     }
 }
+
+#[derive(Debug)]
+pub struct Quirks {
+    pub reset_vf: bool,
+}
+
+impl Default for Quirks {
+    fn default() -> Self {
+        Self { reset_vf: true }
+    }
+}
