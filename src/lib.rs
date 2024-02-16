@@ -1,3 +1,4 @@
+use derive_builder::Builder;
 use thiserror::Error;
 
 pub mod chip8;
@@ -73,13 +74,38 @@ impl TryFrom<u8> for Key {
     }
 }
 
-#[derive(Debug)]
+/// Chip 8 has various quirks that differ from extension to extension.
+/// This struct contains them, and can be adjusted depending on the game
+/// being run.
+///
+/// A `Default` implementation is provided for the original Chip 8 platform.
+#[derive(Debug, Builder)]
+#[builder(default)]
 pub struct Quirks {
+    /// Should the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
     pub reset_vf: bool,
+
+    /// Should the `Fx55` and `Fx65` opcodes increment the index register? The
+    /// original COSMAC VIP incremented the index register for these opcodes.
+    /// Games from the 1970s and 1980s might rely on it being incremented.
+    /// Modern games might rely on it not being incremented.
+    pub increment_ir: bool,
+}
+
+impl Quirks {
+    pub fn new(reset_vf: bool, increment_ir: bool) -> Self {
+        Self {
+            reset_vf,
+            increment_ir,
+        }
+    }
 }
 
 impl Default for Quirks {
     fn default() -> Self {
-        Self { reset_vf: true }
+        Self {
+            reset_vf: true,
+            increment_ir: true,
+        }
     }
 }

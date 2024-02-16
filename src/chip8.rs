@@ -639,6 +639,14 @@ where
     }
 
     fn opcode_0xfyyy(&mut self) -> OpcodeResult {
+        macro_rules! increment_ir {
+            () => {
+                if self.quirks.increment_ir {
+                    self.ir += 1;
+                }
+            };
+        }
+
         match self.opcode & 0xFF {
             // Fx07 - LD Vx, DT
             // Set Vx = delay timer value.
@@ -737,6 +745,8 @@ where
                 for i in 0..=x {
                     self.memory[addr as usize] = self.registers[i];
                     addr += REG_SIZE;
+
+                    increment_ir!();
                 }
 
                 Ok(ProgramCounter::Next)
@@ -752,6 +762,8 @@ where
                 for i in 0..=x {
                     self.registers[i] = self.memory[addr as usize];
                     addr += REG_SIZE;
+
+                    increment_ir!();
                 }
 
                 Ok(ProgramCounter::Next)
@@ -820,7 +832,7 @@ mod tests {
 
     use crate::graphics::Graphics;
     use crate::traits::GraphicsBuffer;
-    use crate::Quirks;
+    use crate::{Quirks, QuirksBuilder};
 
     use super::FLAG_REGISTER;
     use super::{Chip8, ProgramCounter};
@@ -833,10 +845,8 @@ mod tests {
         chip8
     }
 
-    fn create_chip8_no_reset_vf(opcode: u16) -> Chip8<Graphics> {
+    fn create_chip8_with_quirks(opcode: u16, quirks: Quirks) -> Chip8<Graphics> {
         let graphics = Graphics::new();
-
-        let quirks = Quirks { reset_vf: false };
 
         let (_, timer_rx) = mpsc::channel();
         let mut chip8 = Chip8::new(graphics, timer_rx, quirks);
@@ -888,32 +898,43 @@ mod tests {
         assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
     }
 
-    #[test]
-    fn test_copy_to_mem() {
-        let mut chip8 = create_chip8(0xF555);
+    fn test_copy_to_mem_impl(quirks: Quirks, starting_ir: usize, ending_ir: u16) {
+        let mut chip8 = create_chip8_with_quirks(0xF555, quirks);
 
         for i in 0..=5 {
             chip8.registers[i] = (i + 1) as u8;
         }
 
-        chip8.ir = 0x500;
+        chip8.ir = starting_ir as u16;
 
         let result = chip8.opcode_0xfyyy();
 
         assert_eq!(result, Ok(ProgramCounter::Next));
-        assert_eq!(chip8.memory[chip8.ir as usize], 1);
-        assert_eq!(chip8.memory[chip8.ir as usize + 1], 2);
-        assert_eq!(chip8.memory[chip8.ir as usize + 2], 3);
-        assert_eq!(chip8.memory[chip8.ir as usize + 3], 4);
-        assert_eq!(chip8.memory[chip8.ir as usize + 4], 5);
-        assert_eq!(chip8.memory[chip8.ir as usize + 5], 6);
+        assert_eq!(chip8.memory[starting_ir], 1);
+        assert_eq!(chip8.memory[starting_ir + 1], 2);
+        assert_eq!(chip8.memory[starting_ir + 2], 3);
+        assert_eq!(chip8.memory[starting_ir + 3], 4);
+        assert_eq!(chip8.memory[starting_ir + 4], 5);
+        assert_eq!(chip8.memory[starting_ir + 5], 6);
+        assert_eq!(chip8.ir, ending_ir);
     }
 
     #[test]
-    fn test_copy_from_mem() {
-        let mut chip8 = create_chip8(0xF565);
+    fn test_copy_to_mem() {
+        let quirks = QuirksBuilder::default().increment_ir(true).build().unwrap();
+        test_copy_to_mem_impl(quirks, 0x500, 0x506);
+    }
 
-        chip8.ir = 0x500;
+    #[test]
+    fn test_copy_to_mem_no_increment_ir() {
+        let quirks = QuirksBuilder::default().increment_ir(false).build().unwrap();
+        test_copy_to_mem_impl(quirks, 0x500, 0x500);
+    }
+
+    fn test_copy_from_mem_impl(quirks: Quirks, starting_ir: u16, ending_ir: u16) {
+        let mut chip8 = create_chip8_with_quirks(0xF565, quirks);
+
+        chip8.ir = starting_ir;
 
         for i in 0..=5 {
             chip8.memory[chip8.ir as usize + i] = (i + 1) as u8;
@@ -929,6 +950,19 @@ mod tests {
         assert_eq!(chip8.registers[3], 4);
         assert_eq!(chip8.registers[4], 5);
         assert_eq!(chip8.registers[5], 6);
+        assert_eq!(chip8.ir, ending_ir);
+    }
+
+    #[test]
+    fn test_copy_from_mem() {
+        let quirks = QuirksBuilder::default().increment_ir(true).build().unwrap();
+        test_copy_from_mem_impl(quirks, 0x500, 0x506);
+    }
+
+    #[test]
+    fn test_copy_from_mem_no_increment_ir() {
+        let quirks = QuirksBuilder::default().increment_ir(false).build().unwrap();
+        test_copy_from_mem_impl(quirks, 0x500, 0x500);
     }
 
     #[test]
@@ -1131,7 +1165,10 @@ mod tests {
                 #[test]
                 fn $name() {
                     let (opcode, reg1_start_val, reg2_start_val, reg1_end) = $values;
-                    let mut chip8 = create_chip8_no_reset_vf(0x83F5);
+
+                    let quirks = QuirksBuilder::default().reset_vf(false).build().unwrap();
+
+                    let mut chip8 = create_chip8_with_quirks(0x83F5, quirks);
                     let (x, y) = chip8.get_regs_x_y();
 
                     // Setup this test so we get 0 - 1, which will set the carry flag
