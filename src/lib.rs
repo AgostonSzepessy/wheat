@@ -83,27 +83,39 @@ impl TryFrom<u8> for Key {
 #[builder(default)]
 pub struct Quirks {
     /// Should the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
+    ///
+    /// Default: `true`.
     pub reset_vf: bool,
 
     /// Should the `Fx55` and `Fx65` opcodes increment the index register? The
     /// original COSMAC VIP incremented the index register for these opcodes.
     /// Games from the 1970s and 1980s might rely on it being incremented.
     /// Modern games might rely on it not being incremented.
+    ///
+    /// Default: `true`.
     pub increment_ir: bool,
 
     /// This applies to the shift instructions, `8XY6` and `8XYE`. Should register `VX` be
     /// set to the value of register `VY` before shifting?
     /// The original COSMAC VIP would set `VX` to `VY` and then perform the shift. Starting with
     /// CHIP-48 and SUPER-CHIP, `VX` was shifted in place, and `VY` was ignored completely.
+    ///
+    /// Default: `true`.
     pub use_vy_in_shift: bool,
+
+    /// The original COSMAC VIP used `Bnnn` as jump to `nnn + V0`. Later this instruction turned
+    /// into `Bxnn`: jump to `nn + Vx`. Turning this option on treats `0xB` instructions as `0xBxnn`,
+    /// i.e. using the value of `Vx` as part of the jump instead of `V0`.
+    pub use_vx_in_jump: bool,
 }
 
 impl Quirks {
-    pub fn new(reset_vf: bool, increment_ir: bool, shift: bool) -> Self {
+    pub fn new(reset_vf: bool, increment_ir: bool, use_vy_in_shift: bool, use_vx_in_jump: bool) -> Self {
         Self {
             reset_vf,
             increment_ir,
-            use_vy_in_shift: shift,
+            use_vy_in_shift,
+            use_vx_in_jump,
         }
     }
 }
@@ -114,6 +126,7 @@ impl Default for Quirks {
             reset_vf: true,
             increment_ir: true,
             use_vy_in_shift: true,
+            use_vx_in_jump: false,
         }
     }
 }

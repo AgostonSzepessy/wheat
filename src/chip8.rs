@@ -571,8 +571,16 @@ where
     fn opcode_0xbyyy(&mut self) -> OpcodeResult {
         // Bnnn - JP V0, nnn
         // Jump to location nnn + V0 (set pc = nnn + V0)
-        let val = self.opcode & 0x0FFF;
-        Ok(ProgramCounter::Set(val + self.registers[0x0] as u16))
+        // With quirk `use_vx_in_jump`, it is:
+        // Bxnn - JP Vx, nn (set pc = Vx + nn)
+        if !self.quirks.use_vx_in_jump {
+            let val = self.opcode & 0x0FFF;
+            Ok(ProgramCounter::Set(val + self.registers[0x0] as u16))
+        } else {
+            let (x, _) = self.get_regs_x_y();
+            let val = self.opcode & 0x00FF;
+            Ok(ProgramCounter::Set(val + self.registers[x] as u16))
+        }
     }
 
     /// Takes care of opcodes that start with 0xC
@@ -1094,6 +1102,18 @@ mod tests {
         let result = chip8.opcode_0xbyyy();
 
         assert_eq!(result, Ok(ProgramCounter::Set(0xFF + 0x120)));
+    }
+
+    #[test]
+    fn test_0xbyyy_with_jump_quirk() {
+        let quirks = QuirksBuilder::default().use_vx_in_jump(true).build().unwrap();
+        let mut chip8 = create_chip8_with_quirks(0xB120, quirks);
+        chip8.registers[0] = 0x0F;
+        chip8.registers[1] = 0xFF;
+
+        let result = chip8.opcode_0xbyyy();
+
+        assert_eq!(result, Ok(ProgramCounter::Set(0xFF + 0x020)));
     }
 
     fn test_arithmetic_impl(
