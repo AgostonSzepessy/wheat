@@ -107,15 +107,29 @@ pub struct Quirks {
     /// into `Bxnn`: jump to `nn + Vx`. Turning this option on treats `0xB` instructions as `0xBxnn`,
     /// i.e. using the value of `Vx` as part of the jump instead of `V0`.
     pub use_vx_in_jump: bool,
+
+    /// The original COSMAC VIP clipped sprites if part of them extended past the screen. If the whole
+    /// thing extends past the screen, it will draw the whole thing wrapped around. If clipping is turned
+    /// on, sprites will only wrap around if they'd be completely off the screen.
+    ///
+    /// Default: `true`.
+    pub clipping: bool,
 }
 
 impl Quirks {
-    pub fn new(reset_vf: bool, increment_ir: bool, use_vy_in_shift: bool, use_vx_in_jump: bool) -> Self {
+    pub fn new(
+        reset_vf: bool,
+        increment_ir: bool,
+        use_vy_in_shift: bool,
+        use_vx_in_jump: bool,
+        clipping: bool,
+    ) -> Self {
         Self {
             reset_vf,
             increment_ir,
             use_vy_in_shift,
             use_vx_in_jump,
+            clipping,
         }
     }
 }
@@ -127,6 +141,7 @@ impl Default for Quirks {
             increment_ir: true,
             use_vy_in_shift: true,
             use_vx_in_jump: false,
+            clipping: true,
         }
     }
 }

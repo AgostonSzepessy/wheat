@@ -55,9 +55,11 @@ impl GraphicsBuffer for Graphics {
     /// `ir`: The index register, which contains the area of memory to
     /// start reading the sprite from.
     /// `memory`: The memory from which to read the sprite.
-    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: u16, memory: &Vec<u8>) -> bool {
+    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: u16, memory: &Vec<u8>, clipping: bool) -> bool {
         // Assume no collisions happen
         let mut pixel_flipped = false;
+        let x = x % SCREEN_WIDTH as u8;
+        let y = y % SCREEN_HEIGHT as u8;
 
         // Width of each pixel is 8 bits, and height is determined by the last nibble in opcode
         for row in 0..num_rows {
@@ -68,8 +70,15 @@ impl GraphicsBuffer for Graphics {
                 let pixel = (sprite >> (7 - bit)) & 0x1;
 
                 // Allow wrap-around by modulusing the result
-                let pos_y = ((y + row) as u16 % SCREEN_HEIGHT) as usize;
-                let pos_x = ((x + bit) as u16 % SCREEN_WIDTH) as usize;
+                let mut pos_y = (y + row) as usize;
+                let mut pos_x = (x + bit) as usize;
+
+                if clipping && (pos_y >= SCREEN_HEIGHT as usize || pos_x >= SCREEN_WIDTH as usize) {
+                    continue;
+                } else {
+                    pos_y %= SCREEN_HEIGHT as usize;
+                    pos_x %= SCREEN_WIDTH as usize;
+                }
 
                 if pixel == PIXEL_ON && self.screen[pos_y][pos_x] == PIXEL_ON {
                     self.screen[pos_y][pos_x] ^= pixel;
@@ -92,15 +101,67 @@ impl GraphicsBuffer for Graphics {
 
 #[cfg(test)]
 mod tests {
+    use crate::chip8::MEMORY_SIZE;
+
     use super::*;
 
-    // #[test]
-    // fn test_clear() {
-    //     let mut graphics = Graphics::new();
-    //     graphics.clear();
+    #[test]
+    fn test_clear() {
+        let mut graphics = Graphics::new();
+        graphics.clear();
 
-    //     for i in 0..graphics.screen.len() {
-    //         assert_eq!(graphics.screen[i], 0);
-    //     }
-    // }
+        for i in 0..graphics.screen.len() {
+            for j in 0..graphics.screen[0].len() {
+                assert_eq!(graphics.screen[i][j], 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_clipping_on() {
+        let mut memory = vec![0 as u8; MEMORY_SIZE];
+        memory[0] = 255 as u8;
+        memory[1] = 255 as u8;
+
+        let mut graphics = Graphics::new();
+
+        graphics.draw(
+            SCREEN_WIDTH as u8 - 1,
+            SCREEN_HEIGHT as u8 - 1,
+            2,
+            0,
+            &memory,
+            true,
+        );
+
+        assert_eq!(graphics.screen[0][0], 0);
+        assert_eq!(
+            graphics.screen[SCREEN_HEIGHT as usize - 1][SCREEN_WIDTH as usize - 1],
+            1
+        );
+    }
+
+    #[test]
+    fn test_clipping_off() {
+        let mut memory = vec![0 as u8; MEMORY_SIZE];
+        memory[0] = 255 as u8;
+        memory[1] = 255 as u8;
+
+        let mut graphics = Graphics::new();
+
+        graphics.draw(
+            SCREEN_WIDTH as u8 - 1,
+            SCREEN_HEIGHT as u8 - 1,
+            2,
+            0,
+            &memory,
+            false,
+        );
+
+        assert_eq!(graphics.screen[0][0], 1);
+        assert_eq!(
+            graphics.screen[SCREEN_HEIGHT as usize - 1][SCREEN_WIDTH as usize - 1],
+            1
+        );
+    }
 }

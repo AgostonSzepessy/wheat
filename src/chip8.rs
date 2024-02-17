@@ -39,7 +39,7 @@ pub struct Chip8<G> {
 const APP_LOCATION: u16 = 0x200;
 
 // Total memory available to Chip8
-const MEMORY_SIZE: usize = 4096;
+pub(crate) const MEMORY_SIZE: usize = 4096;
 
 // Total size of the stock
 const STACK_SIZE: usize = 16;
@@ -609,7 +609,9 @@ where
         let x = self.registers[x_reg];
         let y = self.registers[y_reg];
 
-        let flipped = self.graphics.draw(x, y, num_rows, self.ir, &self.memory);
+        let flipped = self
+            .graphics
+            .draw(x, y, num_rows, self.ir, &self.memory, self.quirks.clipping);
         self.draw_on_screen = true;
 
         if flipped {
@@ -873,7 +875,9 @@ mod tests {
     fn test_0x00e0() {
         let mut chip8 = create_chip8(0x00e0);
         // Draw the first sprite digit - digits are loaded starting at 0x0 and are all 5 bytes tall
-        chip8.graphics.draw(0, 0, 5, 0, &chip8.memory);
+        chip8
+            .graphics
+            .draw(0, 0, 5, 0, &chip8.memory, chip8.quirks.clipping);
 
         let pc_op = chip8.opcode_0x0yyy();
 
