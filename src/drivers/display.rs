@@ -34,7 +34,7 @@ impl SdlDisplayDriver {
 }
 
 impl Display for SdlDisplayDriver {
-    fn draw(&mut self, buffer: &Vec<Vec<u8>>) {
+    fn draw(&mut self, buffer: &[Vec<u8>]) {
         for row in 0..SCREEN_HEIGHT {
             for col in 0..SCREEN_WIDTH {
                 let x = col * SCALE_FACTOR;

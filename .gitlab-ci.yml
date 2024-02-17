@@ -11,6 +11,7 @@ test:cargo:
     script:
     - rustc --version && cargo --version # Print version info for debugging
     - time cargo test --verbose --release
+    - cargo clippy
     cache:
         paths:
         - target/

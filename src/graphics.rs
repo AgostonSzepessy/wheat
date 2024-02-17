@@ -1,7 +1,6 @@
 use crate::traits::GraphicsBuffer;
-use crate::{SCREEN_HEIGHT, SCREEN_SIZE, SCREEN_WIDTH, SPRITE_WIDTH};
+use crate::{SCREEN_HEIGHT, SCREEN_WIDTH, SPRITE_WIDTH};
 
-const PIXEL_OFF: u8 = 0;
 const PIXEL_ON: u8 = 1;
 
 /// Graphics processor for Chip8. The emulator has a screen that is `64`x`32` pixels.
@@ -13,7 +12,7 @@ const PIXEL_ON: u8 = 1;
 ///
 /// Sprites are `XOR`ed onto the screen, and if a pixel flips from `1` to `0`, it is signalled in
 /// the `VF` register.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Graphics {
     /// Screen on which sprites are drawn
     screen: Vec<Vec<u8>>,
@@ -28,12 +27,12 @@ impl Graphics {
         }
     }
 
-    fn dump(&self) {
+    pub fn dump(&self) {
         for i in 0..self.screen.len() {
             for j in 0..self.screen[0].len() {
                 print!("{} ", self.screen[i][j]);
             }
-            println!("");
+            println!();
         }
     }
 }
@@ -55,7 +54,7 @@ impl GraphicsBuffer for Graphics {
     /// `ir`: The index register, which contains the area of memory to
     /// start reading the sprite from.
     /// `memory`: The memory from which to read the sprite.
-    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: u16, memory: &Vec<u8>, clipping: bool) -> bool {
+    fn draw(&mut self, x: u8, y: u8, num_rows: u8, ir: u16, memory: &[u8], clipping: bool) -> bool {
         // Assume no collisions happen
         let mut pixel_flipped = false;
         let x = x % SCREEN_WIDTH as u8;

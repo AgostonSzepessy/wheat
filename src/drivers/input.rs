@@ -1,7 +1,6 @@
 use std::{ops::Deref, sync::mpsc::Receiver};
 
-pub(self) use chip8::traits::Input;
-use chip8::Key;
+use chip8::{traits::Input, Key};
 use sdl2::{keyboard::Keycode, EventPump};
 use thiserror::Error;
 
@@ -38,9 +37,8 @@ impl SdlInput {
     pub fn update(&mut self) -> InputUpdate {
         if let Some(event) = self.event_pump.poll_event() {
             use sdl2::event::Event;
-            match event {
-                Event::Quit { .. } => return InputUpdate::Quit,
-                _ => (),
+            if let Event::Quit { .. } = event {
+                return InputUpdate::Quit;
             }
         }
 

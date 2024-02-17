@@ -123,9 +123,7 @@ where
     pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>, quirks: Quirks) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
-        for i in 0..HEX_DIGITS.len() {
-            memory[i] = HEX_DIGITS[i];
-        }
+        memory[..HEX_DIGITS.len()].copy_from_slice(&HEX_DIGITS[..]);
 
         Chip8 {
             opcode: 0,
@@ -258,10 +256,10 @@ where
 
     // Utility function to return the number of registers x and y.
     fn get_regs_x_y(&self) -> (usize, usize) {
-        return (
+        (
             ((self.opcode & 0x0F00) >> 8) as usize,
             ((self.opcode & 0x00F0) >> 4) as usize,
-        );
+        )
     }
 
     fn unknown_opcode(&mut self) -> OpcodeResult {
@@ -740,9 +738,9 @@ where
                 let (x, _) = self.get_regs_x_y();
                 let val = self.registers[x];
 
-                let hundreds = (val / 100) as u8;
-                let tens = ((val / 10) % 10) as u8;
-                let ones = (val % 10) as u8;
+                let hundreds = val / 100;
+                let tens = (val / 10) % 10;
+                let ones = val % 10;
 
                 self.memory[self.ir as usize] = hundreds;
                 self.memory[self.ir as usize + 1] = tens;
