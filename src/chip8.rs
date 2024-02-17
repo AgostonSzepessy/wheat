@@ -200,7 +200,7 @@ where
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
         if self.opcode != 0xf00a {
-            println!("opcode is {:#x}", self.opcode);
+            // println!("opcode is {:#x}", self.opcode);
         }
 
         match self.opcode & 0xF000 {
@@ -673,8 +673,6 @@ where
             0x07 => {
                 let (x, _) = self.get_regs_x_y();
                 self.registers[x] = self.delay_timer;
-                println!("self.registers[x] = delay timer");
-                println!("self.registers[{:#x}] = {}", x, self.delay_timer);
                 Ok(ProgramCounter::Next)
             }
 
@@ -699,8 +697,6 @@ where
             0x15 => {
                 let (x, _) = self.get_regs_x_y();
                 self.delay_timer = self.registers[x];
-                println!("delay timer = self.registers[x]");
-                println!("delay timer = {} (register[{:#}]", self.registers[x], x);
                 Ok(ProgramCounter::Next)
             }
 

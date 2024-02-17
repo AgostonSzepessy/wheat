@@ -42,7 +42,7 @@ fn main() -> Result<(), String> {
     let mut chip8 = Chip8::new(graphics, timer_rx, Quirks::default());
 
     // Start with 500Hz, make this adjustable later
-    let chip8_freq = Frequency::from_hertz(500.into());
+    let chip8_freq = Frequency::from_hertz(800.into());
     let sleep_time = chip8_freq.as_period();
 
     match chip8.load_rom(&rom) {
