@@ -1,7 +1,7 @@
-use std::sync::mpsc::Receiver;
+use std::{ops::Deref, sync::mpsc::Receiver};
 
-pub(self) use crate::traits::Input;
-use crate::Key;
+pub(self) use chip8::traits::Input;
+use chip8::Key;
 use sdl2::{keyboard::Keycode, EventPump};
 use thiserror::Error;
 
@@ -58,9 +58,9 @@ impl SdlInput {
             }
 
             for k in keys_pressed {
-                if let Ok(chip8_key) = <Keycode as TryInto<Key>>::try_into(k) {
-                    self.input_impl.keys[chip8_key as usize] = true;
-                    println!("{:?} was pressed", chip8_key);
+                if let Ok(chip8_key) = <Keycode as TryInto<Chip8Key>>::try_into(k) {
+                    self.input_impl.keys[*chip8_key as usize] = true;
+                    println!("{:?} was pressed", *chip8_key);
                 }
             }
         }
@@ -85,27 +85,37 @@ pub enum InputError {
     UnsupportedKey,
 }
 
-impl TryFrom<Keycode> for Key {
+struct Chip8Key(Key);
+
+impl Deref for Chip8Key {
+    type Target = Key;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TryFrom<Keycode> for Chip8Key {
     type Error = InputError;
 
     fn try_from(value: Keycode) -> Result<Self, Self::Error> {
         match value {
-            Keycode::Num1 => Ok(Key::Num1),
-            Keycode::Num2 => Ok(Key::Num2),
-            Keycode::Num3 => Ok(Key::Num3),
-            Keycode::Num4 => Ok(Key::C),
-            Keycode::Q => Ok(Key::Num4),
-            Keycode::W => Ok(Key::Num5),
-            Keycode::E => Ok(Key::Num6),
-            Keycode::R => Ok(Key::D),
-            Keycode::A => Ok(Key::Num7),
-            Keycode::S => Ok(Key::Num8),
-            Keycode::D => Ok(Key::Num9),
-            Keycode::F => Ok(Key::E),
-            Keycode::Z => Ok(Key::A),
-            Keycode::X => Ok(Key::Num0),
-            Keycode::C => Ok(Key::B),
-            Keycode::V => Ok(Key::F),
+            Keycode::Num1 => Ok(Chip8Key(Key::Num1)),
+            Keycode::Num2 => Ok(Chip8Key(Key::Num2)),
+            Keycode::Num3 => Ok(Chip8Key(Key::Num3)),
+            Keycode::Num4 => Ok(Chip8Key(Key::C)),
+            Keycode::Q => Ok(Chip8Key(Key::Num4)),
+            Keycode::W => Ok(Chip8Key(Key::Num5)),
+            Keycode::E => Ok(Chip8Key(Key::Num6)),
+            Keycode::R => Ok(Chip8Key(Key::D)),
+            Keycode::A => Ok(Chip8Key(Key::Num7)),
+            Keycode::S => Ok(Chip8Key(Key::Num8)),
+            Keycode::D => Ok(Chip8Key(Key::Num9)),
+            Keycode::F => Ok(Chip8Key(Key::E)),
+            Keycode::Z => Ok(Chip8Key(Key::A)),
+            Keycode::X => Ok(Chip8Key(Key::Num0)),
+            Keycode::C => Ok(Chip8Key(Key::B)),
+            Keycode::V => Ok(Chip8Key(Key::F)),
             _ => Err(InputError::UnsupportedKey),
         }
     }
@@ -131,8 +141,8 @@ impl Input for SdlInputImpl {
 
 #[cfg(test)]
 mod tests {
-    use super::SdlInputImpl;
-    use crate::{traits::Input, Key};
+    use super::{Chip8Key, SdlInputImpl};
+    use chip8::{traits::Input, Key};
     use sdl2::keyboard::Keycode;
 
     macro_rules! update_test {
@@ -142,7 +152,7 @@ mod tests {
                 fn $name() {
                     let (input_key, input_val) = $value;
                     let mut input = SdlInputImpl::new();
-                    input.keys[<Keycode as TryInto<Key>>::try_into(input_key).unwrap() as usize] = true;
+                    input.keys[*(<Keycode as TryInto<Chip8Key>>::try_into(input_key).unwrap()) as usize] = true;
                     assert_eq!(input.is_pressed(input_val.try_into().unwrap()), true);
                 }
             )*

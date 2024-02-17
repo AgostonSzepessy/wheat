@@ -1,17 +1,10 @@
 mod drivers;
-use chip8::{
-    chip8::Chip8,
-    graphics::Graphics,
-    input::{InputUpdate, SdlInput},
-    timer::TimerOperation,
-    traits::Display,
-    Quirks,
-};
+use chip8::{chip8::Chip8, graphics::Graphics, timer::TimerOperation, traits::Display, Quirks};
 use measurements::Frequency;
 
 use std::{process, sync::mpsc, thread, time::Duration};
 
-use drivers::{RomDriver, SdlAudioDriver, SdlDisplayDriver};
+use drivers::{InputUpdate, RomDriver, SdlAudioDriver, SdlDisplayDriver, SdlInput};
 
 fn main() -> Result<(), String> {
     let (timer_tx, timer_rx) = mpsc::channel();

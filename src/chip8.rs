@@ -1,4 +1,3 @@
-use core::num;
 use std::sync::mpsc::Receiver;
 
 use rand::Rng;
