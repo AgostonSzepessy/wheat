@@ -4,7 +4,7 @@ use rand::Rng;
 
 use crate::timer::TimerOperation;
 use crate::traits::{GraphicsBuffer, Input, Rom};
-use crate::{Chip8Error, Key, Quirks};
+use crate::{Chip8Error, DebugOptions, Key, Quirks};
 
 #[derive(Debug)]
 pub struct Chip8<G> {
@@ -32,6 +32,7 @@ pub struct Chip8<G> {
     wait_for_keypress_register: u8,
     wait_for_key_state: WaitForKeyState,
     quirks: Quirks,
+    dbg_options: DebugOptions,
 }
 
 // The default address at which the application is loaded at
@@ -120,7 +121,12 @@ impl<G> Chip8<G>
 where
     G: GraphicsBuffer,
 {
-    pub fn new(graphics: G, timer_rx: Receiver<TimerOperation>, quirks: Quirks) -> Self {
+    pub fn new(
+        graphics: G,
+        timer_rx: Receiver<TimerOperation>,
+        quirks: Quirks,
+        options: DebugOptions,
+    ) -> Self {
         let mut memory = vec![0; MEMORY_SIZE];
 
         memory[..HEX_DIGITS.len()].copy_from_slice(&HEX_DIGITS[..]);
@@ -141,6 +147,7 @@ where
             wait_for_keypress_register: 0,
             wait_for_key_state: WaitForKeyState::None,
             quirks,
+            dbg_options: options,
         }
     }
 
@@ -196,8 +203,8 @@ where
         self.opcode =
             ((self.memory[self.pc as usize] as u16) << 8) | self.memory[self.pc as usize + 1] as u16;
 
-        if self.opcode != 0xf00a {
-            // println!("opcode is {:#x}", self.opcode);
+        if self.dbg_options.print_opcodes {
+            println!("opcode is {:#06X}", self.opcode);
         }
 
         match self.opcode & 0xF000 {
@@ -617,6 +624,10 @@ where
             self.registers[FLAG_REGISTER] = 0;
         }
 
+        if self.dbg_options.dump_graphics {
+            self.dump_graphics();
+        }
+
         Ok(ProgramCounter::Next)
     }
 
@@ -838,6 +849,18 @@ where
             Ok(ProgramCounter::None)
         }
     }
+
+    fn dump_graphics(&self) {
+        let screen = self.graphics.buffer();
+
+        for row in screen {
+            for pixel in row {
+                print!("{} ", pixel);
+            }
+
+            println!();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -846,7 +869,7 @@ mod tests {
 
     use crate::graphics::Graphics;
     use crate::traits::GraphicsBuffer;
-    use crate::{Quirks, QuirksBuilder};
+    use crate::{DebugOptions, Quirks, QuirksBuilder};
 
     use super::FLAG_REGISTER;
     use super::{Chip8, ProgramCounter};
@@ -854,7 +877,7 @@ mod tests {
     fn create_chip8(opcode: u16) -> Chip8<Graphics> {
         let graphics = Graphics::new();
         let (_, timer_rx) = mpsc::channel();
-        let mut chip8 = Chip8::new(graphics, timer_rx, Quirks::default());
+        let mut chip8 = Chip8::new(graphics, timer_rx, Quirks::default(), DebugOptions::default());
         chip8.opcode = opcode;
         chip8
     }
@@ -863,7 +886,7 @@ mod tests {
         let graphics = Graphics::new();
 
         let (_, timer_rx) = mpsc::channel();
-        let mut chip8 = Chip8::new(graphics, timer_rx, quirks);
+        let mut chip8 = Chip8::new(graphics, timer_rx, quirks, DebugOptions::default());
         chip8.opcode = opcode;
         chip8
     }

@@ -26,15 +26,6 @@ impl Graphics {
             screen: vec![vec![0; SCREEN_WIDTH as usize]; SCREEN_HEIGHT as usize],
         }
     }
-
-    pub fn dump(&self) {
-        for i in 0..self.screen.len() {
-            for j in 0..self.screen[0].len() {
-                print!("{} ", self.screen[i][j]);
-            }
-            println!();
-        }
-    }
 }
 
 impl GraphicsBuffer for Graphics {
@@ -87,8 +78,6 @@ impl GraphicsBuffer for Graphics {
                 }
             }
         }
-
-        // self.dump();
 
         pixel_flipped
     }

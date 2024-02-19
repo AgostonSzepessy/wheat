@@ -1,5 +1,8 @@
 mod drivers;
-use chip8::{chip8::Chip8, graphics::Graphics, timer::TimerOperation, traits::Display, QuirksBuilder};
+use chip8::{
+    chip8::Chip8, graphics::Graphics, timer::TimerOperation, traits::Display, DebugOptionsBuilder,
+    QuirksBuilder,
+};
 use clap::Parser;
 use measurements::Frequency;
 
@@ -12,6 +15,14 @@ use drivers::{InputUpdate, RomDriver, SdlAudioDriver, SdlDisplayDriver, SdlInput
 struct Args {
     /// Chip 8 ROM to launch
     rom: String,
+
+    /// Print opcodes as they're interpreted.
+    #[arg(long, default_value_t = false)]
+    print_opcodes: bool,
+
+    /// Dump the graphics buffer after every draw opcode.
+    #[arg(long, default_value_t = false)]
+    dump_graphics: bool,
 
     /// Quirk: hould the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
     #[arg(long, default_value_t = true)]
@@ -63,7 +74,13 @@ fn main() -> Result<(), String> {
         .build()
         .unwrap();
 
-    let mut chip8 = Chip8::new(graphics, timer_rx, quirks);
+    let options = DebugOptionsBuilder::default()
+        .print_opcodes(args.print_opcodes)
+        .dump_graphics(args.dump_graphics)
+        .build()
+        .unwrap();
+
+    let mut chip8 = Chip8::new(graphics, timer_rx, quirks, options);
 
     // Start with 500Hz, make this adjustable later
     let chip8_freq = Frequency::from_hertz(800.into());

@@ -144,3 +144,13 @@ impl Default for Quirks {
         }
     }
 }
+
+/// Options to debug programs and emulator.
+#[derive(Debug, Builder, Default)]
+pub struct DebugOptions {
+    /// Prints opcodes as they're interpreted.
+    pub print_opcodes: bool,
+
+    /// Dumps the graphics buffer after every draw opcode.
+    pub dump_graphics: bool,
+}
