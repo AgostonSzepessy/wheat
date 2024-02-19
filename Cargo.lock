@@ -72,18 +72,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chip8"
-version = "0.1.0"
-dependencies = [
- "clap",
- "derive_builder",
- "measurements",
- "rand",
- "sdl2",
- "thiserror",
-]
-
-[[package]]
 name = "clap"
 version = "4.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -404,6 +392,18 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
+name = "wheat"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "derive_builder",
+ "measurements",
+ "rand",
+ "sdl2",
+ "thiserror",
+]
 
 [[package]]
 name = "windows-sys"

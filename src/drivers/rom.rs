@@ -1,6 +1,6 @@
 use std::fs::{self};
 
-use chip8::traits::Rom;
+use wheat::traits::Rom;
 
 pub struct RomDriver {
     pub rom: Vec<u8>,

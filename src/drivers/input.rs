@@ -1,8 +1,8 @@
 use std::{ops::Deref, sync::mpsc::Receiver};
 
-use chip8::{traits::Input, Key};
 use sdl2::{keyboard::Keycode, EventPump};
 use thiserror::Error;
+use wheat::{traits::Input, Key};
 
 const NUM_KEYS: usize = 16;
 
@@ -139,8 +139,8 @@ impl Input for SdlInputImpl {
 #[cfg(test)]
 mod tests {
     use super::{Chip8Key, SdlInputImpl};
-    use chip8::{traits::Input, Key};
     use sdl2::keyboard::Keycode;
+    use wheat::{traits::Input, Key};
 
     macro_rules! update_test {
         ($($name:ident: $value:expr,)*) => {

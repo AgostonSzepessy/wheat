@@ -1,7 +1,7 @@
 use sdl2::{pixels, rect::Rect, render::Canvas, video::Window};
 
-use chip8::traits::Display;
-use chip8::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use wheat::traits::Display;
+use wheat::{SCREEN_HEIGHT, SCREEN_WIDTH};
 
 const SCALE_FACTOR: u16 = 20;
 const DISPLAY_WIDTH: u16 = SCREEN_WIDTH * SCALE_FACTOR;

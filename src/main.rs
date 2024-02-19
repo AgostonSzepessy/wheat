@@ -1,10 +1,10 @@
 mod drivers;
-use chip8::{
+use clap::Parser;
+use measurements::Frequency;
+use wheat::{
     chip8::Chip8, graphics::Graphics, timer::TimerOperation, traits::Display, DebugOptionsBuilder,
     QuirksBuilder,
 };
-use clap::Parser;
-use measurements::Frequency;
 
 use std::{process, sync::mpsc, thread, time::Duration};
 

@@ -1,7 +1,8 @@
 [package]
-name = "chip8"
+name = "wheat"
+description = "A Chip 8 emulator"
 version = "0.1.0"
-authors = ["Agoston Szepessy <agszepp@gmail.com>"]
+authors = ["Agoston Szepessy <agoston.the.dev@gmail.com>"]
 edition = "2021"
 
 [dependencies]
