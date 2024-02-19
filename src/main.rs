@@ -64,8 +64,12 @@ struct Args {
     dump_graphics: bool,
 }
 
+fn freq_to_time(hertz: f64) -> Duration {
+    let freq = Frequency::from_hertz(hertz);
+    freq.as_period()
+}
+
 fn main() -> Result<(), String> {
-    // TODO: replace with clap later
     let args = Args::parse();
 
     let (timer_tx, timer_rx) = mpsc::channel();
@@ -95,19 +99,22 @@ fn main() -> Result<(), String> {
 
     let mut chip8 = Chip8::new(graphics, timer_rx, quirks, options);
 
-    // Start with 500Hz, make this adjustable later
     let chip8_freq = Frequency::from_hertz(args.freq_cpu.into());
-    let sleep_time = chip8_freq.as_period();
+    let emulation_sleep_time = chip8_freq.as_period();
 
     chip8.load_rom(&rom).map_err(|e| e.to_string())?;
 
+    // Setup separate threads for managing input and timer updates
+    let timer_sleep = freq_to_time(args.freq_timer.into());
+    let input_sleep = freq_to_time(args.freq_input.into());
+
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(args.freq_timer.into()));
+        thread::sleep(timer_sleep);
         timer_tx.send(TimerOperation::Decrement(1)).unwrap();
     });
 
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(args.freq_input.into()));
+        thread::sleep(input_sleep);
         input_tx.send(()).unwrap();
     });
 
@@ -122,7 +129,7 @@ fn main() -> Result<(), String> {
             audio.stop_buzzer();
         }
 
-        thread::sleep(sleep_time);
+        thread::sleep(emulation_sleep_time);
     }
 
     process::exit(0);
