@@ -5,6 +5,10 @@ version = "0.1.0"
 authors = ["Agoston Szepessy <agoston.the.dev@gmail.com>"]
 edition = "2021"
 
+[profile.release-lto]
+inherits = "release"
+lto = "fat"
+
 [dependencies]
 derive_builder = "0.20"
 measurements = "0.11"
