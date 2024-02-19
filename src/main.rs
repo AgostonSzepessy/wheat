@@ -16,13 +16,18 @@ struct Args {
     /// Chip 8 ROM to launch
     rom: String,
 
-    /// Print opcodes as they're interpreted.
-    #[arg(long, default_value_t = false)]
-    print_opcodes: bool,
+    /// Frequency (in Hz) for the Chip 8 CPU to run at. Default is 800 Hz.
+    #[arg(short, long, default_value_t = 800)]
+    freq_cpu: u32,
 
-    /// Dump the graphics buffer after every draw opcode.
-    #[arg(long, default_value_t = false)]
-    dump_graphics: bool,
+    /// Frequency (in Hz) for the input system to scan new keycodes. Default is 12 Hz.
+    #[arg(long, default_value_t = 12)]
+    freq_input: u32,
+
+    /// Frequency (in Hz) for the timers. Default is 60 Hz. It is not recommended to change it from
+    /// the default value.
+    #[arg(long, default_value_t = 60)]
+    freq_timer: u32,
 
     /// Quirk: hould the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
     #[arg(long, default_value_t = true)]
@@ -49,6 +54,14 @@ struct Args {
     /// draws them on the other side.
     #[arg(long, default_value_t = true)]
     q_clipping: bool,
+
+    /// Print opcodes as they're interpreted.
+    #[arg(long, default_value_t = false)]
+    print_opcodes: bool,
+
+    /// Dump the graphics buffer after every draw opcode.
+    #[arg(long, default_value_t = false)]
+    dump_graphics: bool,
 }
 
 fn main() -> Result<(), String> {
@@ -83,26 +96,23 @@ fn main() -> Result<(), String> {
     let mut chip8 = Chip8::new(graphics, timer_rx, quirks, options);
 
     // Start with 500Hz, make this adjustable later
-    let chip8_freq = Frequency::from_hertz(800.into());
+    let chip8_freq = Frequency::from_hertz(args.freq_cpu.into());
     let sleep_time = chip8_freq.as_period();
 
-    match chip8.load_rom(&rom) {
-        Ok(_) => (),
-        Err(e) => println!("{}", e),
-    }
+    chip8.load_rom(&rom).map_err(|e| e.to_string())?;
 
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(17));
+        thread::sleep(Duration::from_millis(args.freq_timer.into()));
         timer_tx.send(TimerOperation::Decrement(1)).unwrap();
     });
 
     thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(12));
+        thread::sleep(Duration::from_millis(args.freq_input.into()));
         input_tx.send(()).unwrap();
     });
 
     while let InputUpdate::Continue = input.update() {
-        let output = chip8.emulate_cycle(input.input()).unwrap();
+        let output = chip8.emulate_cycle(input.input()).map_err(|e| e.to_string())?;
 
         display.draw(output.graphics.buffer());
 

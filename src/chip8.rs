@@ -642,7 +642,7 @@ where
             0x9E => {
                 let (x, _) = self.get_regs_x_y();
 
-                if input.is_pressed((self.registers[x]).try_into().unwrap()) {
+                if input.is_pressed((self.registers[x]).try_into()?) {
                     return Ok(ProgramCounter::Skip);
                 }
 
@@ -656,7 +656,7 @@ where
             0xA1 => {
                 let (x, _) = self.get_regs_x_y();
 
-                if !input.is_pressed((self.registers[x]).try_into().unwrap()) {
+                if !input.is_pressed((self.registers[x]).try_into()?) {
                     return Ok(ProgramCounter::Skip);
                 }
 
@@ -808,7 +808,7 @@ where
                 WaitForKeyState::WaitForNoKeyPressed => {
                     let mut key_pressed = false;
                     for i in 0..=Key::F as u8 {
-                        if input.is_pressed(i.try_into().unwrap()) {
+                        if input.is_pressed(i.try_into()?) {
                             key_pressed = true;
                         }
                     }
@@ -819,7 +819,7 @@ where
                 }
                 WaitForKeyState::CheckForKeyPressed => {
                     for i in 0..=Key::F as u8 {
-                        if input.is_pressed(i.try_into().unwrap()) {
+                        if input.is_pressed(i.try_into()?) {
                             self.registers[self.wait_for_keypress_register as usize] = i;
                             self.wait_for_key_state = WaitForKeyState::WaitForKeyRelease;
                             break;
@@ -830,7 +830,7 @@ where
                 WaitForKeyState::WaitForKeyRelease => {
                     let mut key_pressed = false;
                     for i in 0..=Key::F as u8 {
-                        if input.is_pressed(i.try_into().unwrap()) {
+                        if input.is_pressed(i.try_into()?) {
                             key_pressed = true;
                             break;
                         }
