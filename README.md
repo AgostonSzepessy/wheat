@@ -27,6 +27,8 @@ Run `cargo build` to build the project, and `cargo run <path-to-ROM>` to launch 
 
 ## Configuration
 
+The default quirks/settings for Wheat are set to the quirks that the original CHIP-8 shipped with. There are several options below that allow changing these quirks; some games rely on different quirks to function properly. For example, Space Invaders relies on `--q-use-vy-in-shift` being set to `false`. Otherwise, enemies can disappear randomly. More quirks can be found [here](https://chip8.gulrak.net/).
+
 ```txt
 Options:
   -f, --freq-cpu <FREQ_CPU>
