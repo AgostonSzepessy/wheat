@@ -1,5 +1,5 @@
 mod drivers;
-use clap::Parser;
+use clap::{ArgAction, Parser};
 use measurements::Frequency;
 use wheat::{
     chip8::Chip8, graphics::Graphics, timer::TimerOperation, traits::Display, DebugOptionsBuilder,
@@ -16,51 +16,51 @@ struct Args {
     /// Chip 8 ROM to launch
     rom: String,
 
-    /// Frequency (in Hz) for the Chip 8 CPU to run at. Default is 800 Hz.
+    /// Frequency (in Hz) for the Chip 8 CPU to run at.
     #[arg(short, long, default_value_t = 800)]
     freq_cpu: u32,
 
-    /// Frequency (in Hz) for the input system to scan new keycodes. Default is 12 Hz.
+    /// Frequency (in Hz) for the input system to scan new keycodes.
     #[arg(long, default_value_t = 12)]
     freq_input: u32,
 
-    /// Frequency (in Hz) for the timers. Default is 60 Hz. It is not recommended to change it from
+    /// Frequency (in Hz) for the timers. It is not recommended to change it from
     /// the default value.
     #[arg(long, default_value_t = 60)]
     freq_timer: u32,
 
     /// Quirk: hould the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     q_reset_vf: bool,
 
     /// Quirk: should the `Fx55` and `Fx65` opcodes increment the index register?
     /// Games from the 1970s and 1980s might rely on it being incremented.
     /// Modern games might rely on it not being incremented.
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     q_increment_ir: bool,
 
     /// Quirk: should register `VX` be set to the value of register `VY` before shifting?
     /// Modern games might require this to be false.
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     q_use_vy_in_shift: bool,
 
     /// Quirk: allow using registers in `0xBnnn` instruction? Interprets `0xB` instructions
     /// as `0xBXnn`, where `X` is the register to use as part of the jump, i.e.
     /// `VX + nn` instead of `V0 + nnn`.
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, action = ArgAction::Set)]
     q_use_vx_in_jump: bool,
 
     /// Quirk: clip the drawings that extend past the screen? Otherwise wraps them and
     /// draws them on the other side.
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     q_clipping: bool,
 
     /// Print opcodes as they're interpreted.
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, action = ArgAction::Set)]
     print_opcodes: bool,
 
     /// Dump the graphics buffer after every draw opcode.
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, action = ArgAction::Set)]
     dump_graphics: bool,
 }
 

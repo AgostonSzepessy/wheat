@@ -29,16 +29,28 @@ Run `cargo build` to build the project, and `cargo run <path-to-ROM>` to launch 
 
 ```txt
 Options:
-  -f, --freq-cpu <FREQ_CPU>      Frequency (in Hz) for the Chip 8 CPU to run at. Default is 800 Hz [default: 800]
-      --freq-input <FREQ_INPUT>  Frequency (in Hz) for the input system to scan new keycodes. Default is 12 Hz [default: 12]
-      --freq-timer <FREQ_TIMER>  Frequency (in Hz) for the timers. Default is 60 Hz. It is not recommended to change it from the default value [default: 60]
-      --q-reset-vf               Quirk: hould the `AND`, `OR`, and `XOR` instructions reset the `VF` register?
-      --q-increment-ir           Quirk: should the `Fx55` and `Fx65` opcodes increment the index register? Games from the 1970s and 1980s might rely on it being incremented. Modern games might rely on it not being incremented
-      --q-use-vy-in-shift        Quirk: should register `VX` be set to the value of register `VY` before shifting? Modern games might require this to be false
-      --q-use-vx-in-jump         Quirk: allow using registers in `0xBnnn` instruction? Interprets `0xB` instructions as `0xBXnn`, where `X` is the register to use as part of the jump, i.e. `VX + nn` instead of `V0 + nnn`
-      --q-clipping               Quirk: clip the drawings that extend past the screen? Otherwise wraps them and draws them on the other side
-      --print-opcodes            Print opcodes as they're interpreted
-      --dump-graphics            Dump the graphics buffer after every draw opcode
-  -h, --help                     Print help
-  -V, --version                  Print version
+  -f, --freq-cpu <FREQ_CPU>
+          Frequency (in Hz) for the Chip 8 CPU to run at [default: 800]
+      --freq-input <FREQ_INPUT>
+          Frequency (in Hz) for the input system to scan new keycodes [default: 12]
+      --freq-timer <FREQ_TIMER>
+          Frequency (in Hz) for the timers. It is not recommended to change it from the default value [default: 60]
+      --q-reset-vf <Q_RESET_VF>
+          Quirk: hould the `AND`, `OR`, and `XOR` instructions reset the `VF` register? [default: true] [possible values: true, false]
+      --q-increment-ir <Q_INCREMENT_IR>
+          Quirk: should the `Fx55` and `Fx65` opcodes increment the index register? Games from the 1970s and 1980s might rely on it being incremented. Modern games might rely on it not being incremented [default: true] [possible values: true, false]
+      --q-use-vy-in-shift <Q_USE_VY_IN_SHIFT>
+          Quirk: should register `VX` be set to the value of register `VY` before shifting? Modern games might require this to be false [default: true] [possible values: true, false]
+      --q-use-vx-in-jump <Q_USE_VX_IN_JUMP>
+          Quirk: allow using registers in `0xBnnn` instruction? Interprets `0xB` instructions as `0xBXnn`, where `X` is the register to use as part of the jump, i.e. `VX + nn` instead of `V0 + nnn` [default: false] [possible values: true, false]
+      --q-clipping <Q_CLIPPING>
+          Quirk: clip the drawings that extend past the screen? Otherwise wraps them and draws them on the other side [default: true] [possible values: true, false]
+      --print-opcodes <PRINT_OPCODES>
+          Print opcodes as they're interpreted [default: false] [possible values: true, false]
+      --dump-graphics <DUMP_GRAPHICS>
+          Dump the graphics buffer after every draw opcode [default: false] [possible values: true, false]
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
