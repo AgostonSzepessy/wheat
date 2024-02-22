@@ -33,6 +33,8 @@ jobs:
         targets: ${{ matrix.config.target }}
     - name: Build wheat
       run: cargo build --profile release-lto
+    - name: Run tests
+      run: cargo test --profile release-lto
     - name: Prepare build artifact for upload (Windows)
       if: ${{ runner.os == 'Windows' }}
       run: |
