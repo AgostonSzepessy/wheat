@@ -3,7 +3,7 @@ on:
     types: [created]
 
 jobs:
-  release:
+  build:
     name: Build ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
     strategy:
@@ -13,7 +13,7 @@ jobs:
         - {
             name: "Windows Latest",
             os: windows-latest,
-            target: stable-x86_64-pc-windows-msvc
+            target: x86_64-pc-windows-msvc
           }
         - {
             name: "Ubuntu Latest",
@@ -26,7 +26,7 @@ jobs:
             target: x86_64-apple-darwin
           }
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: Install stable
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -45,35 +45,46 @@ jobs:
     - name: Prepare build artifact for upload (Linux)
       if: ${{ runner.os == 'Linux' }}
       run: |
-        mkdir build/release-lto
-        cp target/release-lto/SDL* build/release-lto
+        mkdir -p build/release-lto
+        cp target/release-lto/libSDL*.so build/release-lto
         cp target/release-lto/wheat build/release-lto
     - name: Prepare build artifact for upload (MacOS)
       if: ${{ runner.os == 'macOS' }}
       run: |
-        mkdir build/release-lto
+        mkdir -p build/release-lto
         cp target/release-lto/wheat* build/release-lto
-        cp target/release-lto/SDL* build/release-lto
+        cp target/release-lto/*SDL* build/release-lto
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         path: build/release-lto
-        name: wheat-${{ matrix.target }}-${{ github.ref_name }}
+        name: wheat-${{ matrix.config.target }}-${{ github.ref_name }}
+  
+  release:
+    needs: build
+    if: success()
+    name: Create release (${{ matrix.config.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, x86_64-apple-darwin]
+    steps:
     - name: Download artifact
-      uses: actions/download-artifact@4
+      uses: actions/download-artifact@v4
       with:
         name: wheat-${{ matrix.target }}-${{ github.ref_name }}
         path: release-artifact
+    - name: Debug log
+      run: ls release-artifact
     - name: Generate checksum
       uses: jmgilman/actions-generate-checksum@v1
       with:
         patterns: |
-          release-artifact/*.zip
-          release-artifact/*.tar.gz
+          release-artifact/wheat-${{ matrix.target }}-${{ github.ref_name }}.zip
     - name: Create release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           checksum.txt
-          release-artifact/*.zip
-          release-artifact/*.tar.gz
+          release-artifact/wheat-${{ matrix.target }}-${{ github.ref_name }}.zip
