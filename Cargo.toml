@@ -22,3 +22,6 @@ features = ["bundled"]
 [dependencies.clap]
 version = "4.5"
 features = ["derive"]
+
+[target.'cfg(any())'.dependencies]
+cmake = { version = "0.1.47", optional = true }

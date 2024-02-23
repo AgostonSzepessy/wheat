@@ -398,6 +398,7 @@ name = "wheat"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "cmake",
  "derive_builder",
  "measurements",
  "rand",
